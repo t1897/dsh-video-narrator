@@ -1,5 +1,7 @@
 # Video Narrator for DeepSeek Harness
 
+[English](README.md) | [中文](README.zh.md)
+
 A DSH skill that turns a video, video URL, article URL, PDF, or plain text into a narrated video: cleaned transcript, segmented narration script, title and 10 tags, per-scene image prompts, generated images, TTS audio, and a final MP4 assembled with ffmpeg.
 
 ![Output overview](assets/screenshot-1.png)

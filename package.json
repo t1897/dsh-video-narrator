@@ -23,6 +23,7 @@
     "icon.svg",
     "screenshots.json",
     "README.md",
+    "README.zh.md",
     "LICENSE"
   ],
   "dsh": {
