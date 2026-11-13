@@ -347,7 +347,7 @@ class Project:
     @classmethod
     def create(cls, root: Path, config: dict[str, Any]) -> "Project":
         root.mkdir(parents=True, exist_ok=True)
-        for folder in ("source", "images", "audio", "clips", "final", "logs"):
+        for folder in ("source", "06_images", "audio", "clips", "logs"):
             (root / folder).mkdir(parents=True, exist_ok=True)
         project = cls(root, config)
         project.save()
@@ -761,7 +761,7 @@ def ingest_project(project: Project, args: argparse.Namespace) -> None:
         raise VcsError(f"unsupported input type: {input_type}")
 
     if raw_text:
-        project.p("transcript.raw.txt").write_text(raw_text, encoding="utf-8")
+        project.p("01_transcript.raw.txt").write_text(raw_text, encoding="utf-8")
         meta["chars"] = len(raw_text)
     write_json(source_dir / "source.json", meta)
     platform = _platform_of(raw) if input_type == "video" and raw.startswith(("http://", "https://")) else ("Video" if input_type == "video" else "")
@@ -822,8 +822,8 @@ def transcribe_project(project: Project, *, language: str = "English", model: st
         if text:
             texts.append(text)
     raw = "\n\n".join(texts).strip()
-    project.p("transcript.raw.txt").write_text(raw + "\n", encoding="utf-8")
-    project.mark("asr", [project.p("transcript.raw.txt")], model=model_id, language=language, chunks=len(chunks))
+    project.p("01_transcript.raw.txt").write_text(raw + "\n", encoding="utf-8")
+    project.mark("asr", [project.p("01_transcript.raw.txt")], model=model_id, language=language, chunks=len(chunks))
     eprint(f"asr: {len(raw)} chars")
 
 
@@ -913,17 +913,17 @@ def maybe_rename_project_folder(project: Project, title: str | None = None) -> P
 
 def validate_project(project: Project) -> dict[str, Any]:
     errors: list[str] = []
-    md = project.p("transcript.md")
+    md = project.p("02_transcript.md")
     if not md.exists() or len(md.read_text(encoding="utf-8")) < 500:
-        errors.append("transcript.md is missing or too short (<500 chars)")
-    script = load_json(project.p("script.json"))
+        errors.append("02_transcript.md is missing or too short (<500 chars)")
+    script = load_json(project.p("03_script.json"))
     if not isinstance(script, dict):
-        errors.append("script.json is missing or invalid")
+        errors.append("03_script.json is missing or invalid")
         script = {}
     segments = script.get("segments") if isinstance(script.get("segments"), list) else []
     max_segments = int(project.config.get("max_segments") or 60)
     if not 2 <= len(segments) <= max_segments:
-        errors.append(f"script.json must contain 2-{max_segments} segments (got {len(segments)})")
+        errors.append(f"03_script.json must contain 2-{max_segments} segments (got {len(segments)})")
     total = 0.0
     for index, segment in enumerate(segments, 1):
         narration = str(segment.get("narration") or "").strip()
@@ -947,9 +947,9 @@ def validate_project(project: Project) -> dict[str, Any]:
         target = float(script.get("target_seconds") or project.config.get("minutes", 3) * 60)
         if segments and abs(total - target) / max(1, target) > 0.25:
             errors.append(f"estimated duration {total:.0f}s is more than 25% away from target {target:.0f}s")
-    metadata = load_json(project.p("metadata.json"))
+    metadata = load_json(project.p("04_metadata.json"))
     if not isinstance(metadata, dict):
-        errors.append("metadata.json is missing or invalid")
+        errors.append("04_metadata.json is missing or invalid")
         metadata = {}
     title = str(metadata.get("title") or "").strip()
     if not title:
@@ -959,10 +959,10 @@ def validate_project(project: Project) -> dict[str, Any]:
     tags = metadata.get("tags")
     if not isinstance(tags, list) or len(tags) != 10:
         errors.append(f"metadata.tags must contain exactly 10 items (got {len(tags) if isinstance(tags, list) else 0})")
-    prompts = load_json(project.p("image_prompts.json"))
+    prompts = load_json(project.p("05_image_prompts.json"))
     scenes = prompts.get("scenes") if isinstance(prompts, dict) else None
     if not isinstance(scenes, list) or len(scenes) != len(segments):
-        errors.append("image_prompts.json scenes must match script.json segments")
+        errors.append("05_image_prompts.json scenes must match 03_script.json segments")
     else:
         for index, scene in enumerate(scenes, 1):
             prompt = str(scene.get("prompt") or "")
@@ -971,11 +971,11 @@ def validate_project(project: Project) -> dict[str, Any]:
     if errors:
         raise VcsError("validation failed:\n- " + "\n- ".join(errors))
     attach_source(project, metadata)
-    write_json(project.p("metadata.json"), metadata)
+    write_json(project.p("04_metadata.json"), metadata)
     project.mark("cleanup", [md])
-    project.mark("script", [project.p("script.json")], segments=len(segments), est_seconds=total)
-    project.mark("metadata", [project.p("metadata.json")], tags=len(tags))
-    project.mark("prompts", [project.p("image_prompts.json")], scenes=len(scenes))
+    project.mark("script", [project.p("03_script.json")], segments=len(segments), est_seconds=total)
+    project.mark("metadata", [project.p("04_metadata.json")], tags=len(tags))
+    project.mark("prompts", [project.p("05_image_prompts.json")], scenes=len(scenes))
     maybe_rename_project_folder(project, title)
     return {"segments": len(segments), "est_seconds": total, "title": title, "duration_mode": mode}
 
@@ -1079,22 +1079,22 @@ def text_project(project: Project, stage: str, providers_path: str | None = None
     stages = ["cleanup", "script", "metadata", "prompts"] if stage == "all" else [stage]
 
     if "cleanup" in stages:
-        raw_path = project.p("transcript.raw.txt")
+        raw_path = project.p("01_transcript.raw.txt")
         if not raw_path.exists():
-            raise VcsError("transcript.raw.txt is missing")
+            raise VcsError("01_transcript.raw.txt is missing")
         prompt = render_prompt(load_prompt("01_cleanup.md"), {"transcript": raw_path.read_text(encoding="utf-8")})
         text = _try_text_profiles(
             profiles, prompt, json_mode=False,
             transform=lambda value: value if len(value) >= 500 else (_ for _ in ()).throw(VcsError("cleanup result too short")),
         )
-        project.p("transcript.md").write_text(text.strip() + "\n", encoding="utf-8")
-        project.mark("cleanup", [project.p("transcript.md")], provider="http")
+        project.p("02_transcript.md").write_text(text.strip() + "\n", encoding="utf-8")
+        project.mark("cleanup", [project.p("02_transcript.md")], provider="http")
         eprint("text: cleanup done")
 
     if "script" in stages:
-        md_path = project.p("transcript.md")
+        md_path = project.p("02_transcript.md")
         if not md_path.exists():
-            raise VcsError("transcript.md is missing; run cleanup first")
+            raise VcsError("02_transcript.md is missing; run cleanup first")
         values = dict(plan)
         values.update({
             "minutes": project.config.get("minutes") or "不限",
@@ -1107,14 +1107,14 @@ def text_project(project: Project, stage: str, providers_path: str | None = None
             transform=lambda value: _validate_script_shape(parse_json_response(value)),
         )
         script.setdefault("duration_mode", plan["mode"])
-        write_json(project.p("script.json"), script)
-        project.mark("script", [project.p("script.json")], provider="http")
+        write_json(project.p("03_script.json"), script)
+        project.mark("script", [project.p("03_script.json")], provider="http")
         eprint("text: script done")
 
     if "metadata" in stages:
-        script_path = project.p("script.json")
+        script_path = project.p("03_script.json")
         if not script_path.exists():
-            raise VcsError("script.json is missing; run script first")
+            raise VcsError("03_script.json is missing; run script first")
         prompt = render_prompt(load_prompt("03_metadata.md"), {
             "script_json": json.dumps(load_json(script_path), ensure_ascii=False),
         })
@@ -1123,15 +1123,15 @@ def text_project(project: Project, stage: str, providers_path: str | None = None
             transform=lambda value: _validate_metadata_shape(parse_json_response(value)),
         )
         attach_source(project, metadata)
-        write_json(project.p("metadata.json"), metadata)
+        write_json(project.p("04_metadata.json"), metadata)
         maybe_rename_project_folder(project, metadata.get("title"))
-        project.mark("metadata", [project.p("metadata.json")], provider="http")
+        project.mark("metadata", [project.p("04_metadata.json")], provider="http")
         eprint("text: metadata done")
 
     if "prompts" in stages:
-        script_path = project.p("script.json")
+        script_path = project.p("03_script.json")
         if not script_path.exists():
-            raise VcsError("script.json is missing; run script first")
+            raise VcsError("03_script.json is missing; run script first")
         script = load_json(script_path, {})
         segments = script.get("segments") or []
         template_name = "04_image_16x9.md" if project.config.get("orientation") == "landscape" else "05_image_9x16.md"
@@ -1155,8 +1155,8 @@ def text_project(project: Project, stage: str, providers_path: str | None = None
             "negative": "text, letters, watermark, logo, split screen, collage, multiple panels, deformed hands, extra fingers, oversaturated, plastic skin",
             "scenes": scenes,
         }
-        write_json(project.p("image_prompts.json"), data)
-        project.mark("prompts", [project.p("image_prompts.json")], provider="http")
+        write_json(project.p("05_image_prompts.json"), data)
+        project.mark("prompts", [project.p("05_image_prompts.json")], provider="http")
         eprint(f"text: prompts done ({len(scenes)})")
 
 
@@ -1276,14 +1276,14 @@ def images_project(
     project: Project, *, provider: str | None = None, limit: int | None = None,
     providers_path: str | None = None,
 ) -> None:
-    prompts = load_json(project.p("image_prompts.json"))
+    prompts = load_json(project.p("05_image_prompts.json"))
     if not isinstance(prompts, dict) or not isinstance(prompts.get("scenes"), list):
-        raise VcsError("image_prompts.json is missing or invalid; run `vcs validate` first")
+        raise VcsError("05_image_prompts.json is missing or invalid; run `vcs validate` first")
     provider = provider or project.config.get("providers", {}).get("image", "modelscope")
     orientation = project.config.get("orientation", "portrait")
     size = project.config.get("image_size") or ("928x1664" if orientation == "portrait" else "1664x928")
     negative = prompts.get("negative", "")
-    image_dir = project.p("images")
+    image_dir = project.p("06_images")
     image_dir.mkdir(parents=True, exist_ok=True)
     scenes = prompts["scenes"][:limit] if limit else prompts["scenes"]
 
@@ -1377,9 +1377,9 @@ def tts_project(
     project: Project, *, limit: int | None = None,
     voice_ref: str | None = None, voice_ref_text: str | None = None,
 ) -> None:
-    script = load_json(project.p("script.json"))
+    script = load_json(project.p("03_script.json"))
     if not isinstance(script, dict) or not isinstance(script.get("segments"), list):
-        raise VcsError("script.json is missing or invalid; run `vcs validate` first")
+        raise VcsError("03_script.json is missing or invalid; run `vcs validate` first")
     model_id = project.config.get("models", {}).get("tts", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16")
     voice = str(project.config.get("voice") or "female").lower()
     audio_dir = project.p("audio")
@@ -1468,17 +1468,17 @@ def cmd_tts(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 def compose_project(project: Project, *, keep_intermediates: bool = False) -> Path:
-    script = load_json(project.p("script.json"))
-    metadata = load_json(project.p("metadata.json"))
+    script = load_json(project.p("03_script.json"))
+    metadata = load_json(project.p("04_metadata.json"))
     if not isinstance(script, dict) or not isinstance(metadata, dict):
-        raise VcsError("script.json or metadata.json is missing")
+        raise VcsError("03_script.json or 04_metadata.json is missing")
     attach_source(project, metadata)
-    write_json(project.p("metadata.json"), metadata)
+    write_json(project.p("04_metadata.json"), metadata)
     maybe_rename_project_folder(project, metadata.get("title"))
     clips: list[Path] = []
     for segment in script["segments"]:
         scene_id = int(segment["id"])
-        image = project.p("images", f"scene_{scene_id:03d}.png")
+        image = project.p("06_images", f"scene_{scene_id:03d}.png")
         audio = project.p("audio", f"scene_{scene_id:03d}.wav")
         for need in (image, audio):
             if not need.exists():
@@ -1487,18 +1487,16 @@ def compose_project(project: Project, *, keep_intermediates: bool = False) -> Pa
         if not clip.exists() or clip.stat().st_size < 1024:
             compose_clip(image, audio, clip, project.config)
         clips.append(clip)
-    merged = project.p("final", ".merged.mp4")
+    merged = project.p(".merged.mp4")
     concat_clips(clips, merged)
     project.mark("compose", [merged], clips=len(clips))
-    final_dir = project.p("final")
     title = safe_filename(str(metadata.get("title") or "video"))
-    final_path = final_dir / f"{title}.mp4"
+    final_path = project.p(f"07_{title}.mp4")
     counter = 2
     while final_path.exists():
-        final_path = final_dir / f"{title} ({counter}).mp4"
+        final_path = project.p(f"07_{title} ({counter}).mp4")
         counter += 1
     shutil.move(str(merged), str(final_path))
-    write_json(final_dir / "metadata.json", metadata)
     project.mark("finalize", [final_path], title=title)
     if not keep_intermediates:
         cleanup_intermediates(project)
@@ -1511,8 +1509,11 @@ def cleanup_intermediates(project: Project) -> None:
         path = project.p(folder)
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
-    for path in (project.p("final", ".merged.mp4"), project.p("final", "clips.txt"), project.p("final", "metadata.json")):
+    for path in (project.p(".merged.mp4"), project.p("clips.txt")):
         path.unlink(missing_ok=True)
+    final_dir = project.p("final")
+    if final_dir.exists():
+        shutil.rmtree(final_dir, ignore_errors=True)
     source_dir = project.p("source")
     if source_dir.exists():
         if project.config.get("input_type") == "pdf":
@@ -1531,7 +1532,7 @@ def cleanup_intermediates(project: Project) -> None:
             state["stages"][stage]["status"] = "cleaned"
             state["stages"][stage]["outputs"] = []
     write_json(project.state_path, state)
-    eprint("cleanup: removed audio/, clips/, logs/, temp files; kept transcripts, metadata, prompts, script, images, final")
+    eprint("cleanup: removed audio/, clips/, logs/, temp files; kept 01–07 artifacts")
 
 
 def cmd_rename(args: argparse.Namespace) -> int:
@@ -1547,7 +1548,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         label = str(project.config.get("source_label") or _source_label(project.config.get("input") or None, str(project.config.get("input_type") or "text"), bool(project.config.get("mock"))))
         project.config["folder_base"] = f"{label}_{date_part}"
     project.config["auto_folder_name"] = True
-    metadata = load_json(project.p("metadata.json"), {})
+    metadata = load_json(project.p("04_metadata.json"), {})
     title = str((metadata or {}).get("title") or project.config.get("folder_title") or "")
     maybe_rename_project_folder(project, title)
     print(project.root)
@@ -1629,26 +1630,26 @@ def run_pipeline(project: Project, *, mock: bool) -> Path:
 
     # 1. script
     script = mock_script(config)
-    write_json(project.p("script.json"), script)
-    project.mark("script", [project.p("script.json")], provider="mock", model="mock")
+    write_json(project.p("03_script.json"), script)
+    project.mark("script", [project.p("03_script.json")], provider="mock", model="mock")
     eprint(f"[1/6] script: {len(script['segments'])} segments")
 
     # 2. metadata
     metadata = mock_metadata(script)
     attach_source(project, metadata)
-    write_json(project.p("metadata.json"), metadata)
+    write_json(project.p("04_metadata.json"), metadata)
     maybe_rename_project_folder(project, metadata.get("title"))
-    project.mark("metadata", [project.p("metadata.json")], provider="mock")
+    project.mark("metadata", [project.p("04_metadata.json")], provider="mock")
     eprint(f"[2/6] metadata: {metadata['title']}")
 
     # 3. image prompts
     prompts = mock_image_prompts(script, config)
-    write_json(project.p("image_prompts.json"), prompts)
-    project.mark("prompts", [project.p("image_prompts.json")], orientation=config["orientation"])
+    write_json(project.p("05_image_prompts.json"), prompts)
+    project.mark("prompts", [project.p("05_image_prompts.json")], orientation=config["orientation"])
     eprint(f"[3/6] prompts: {len(prompts['scenes'])}")
 
     # 4. images
-    image_dir = project.p("images")
+    image_dir = project.p("06_images")
     for scene in prompts["scenes"]:
         scene_id = int(scene["id"])
         path = image_dir / f"scene_{scene_id:03d}.png"
@@ -1679,21 +1680,19 @@ def run_pipeline(project: Project, *, mock: bool) -> Path:
         if not clip.exists():
             compose_clip(image, audio, clip, config)
         clips.append(clip)
-    merged = project.p("final", ".merged.mp4")
+    merged = project.p(".merged.mp4")
     concat_clips(clips, merged)
     project.mark("compose", [merged], clips=len(clips))
     eprint(f"[6/6] compose: {ffprobe_duration(merged):.1f}s")
 
     # 7. finalize
-    final_dir = project.p("final")
     title = safe_filename(metadata["title"])
-    final_path = final_dir / f"{title}.mp4"
+    final_path = project.p(f"07_{title}.mp4")
     counter = 2
     while final_path.exists():
-        final_path = final_dir / f"{title} ({counter}).mp4"
+        final_path = project.p(f"07_{title} ({counter}).mp4")
         counter += 1
     shutil.move(str(merged), str(final_path))
-    write_json(final_dir / "metadata.json", metadata)
     project.mark("finalize", [final_path], title=metadata["title"])
     eprint(f"done: {final_path} ({human_size(final_path.stat().st_size)})")
     cleanup_intermediates(project)
@@ -1825,22 +1824,22 @@ def cmd_config(args: argparse.Namespace) -> int:
             state.get("stages", {}).pop(stage, None)
         write_json(project.state_path, state)
         if "script" in invalid:
-            for name in ("script.json", "metadata.json"):
+            for name in ("03_script.json", "04_metadata.json"):
                 project.p(name).unlink(missing_ok=True)
         if "prompts" in invalid:
-            project.p("image_prompts.json").unlink(missing_ok=True)
+            project.p("05_image_prompts.json").unlink(missing_ok=True)
         if "images" in invalid:
-            for path in project.p("images").glob("*"):
+            for path in project.p("06_images").glob("*"):
                 if path.is_file():
                     path.unlink()
         if "tts" in invalid:
             for path in project.p("audio").glob("*"):
                 if path.is_file():
                     path.unlink()
-        for folder, suffix in (("clips", ".mp4"), ("final", ".mp4")):
-            for path in project.p(folder).glob(f"*{suffix}"):
-                path.unlink()
-        project.p("final", "metadata.json").unlink(missing_ok=True)
+        for path in project.p("clips").glob("*.mp4"):
+            path.unlink()
+        for path in project.root.glob("07_*.mp4"):
+            path.unlink()
 
     project.save()
     print(json.dumps({
@@ -1947,11 +1946,11 @@ def cmd_status(args: argparse.Namespace) -> int:
         status = row.get("status", "pending")
         detail = ""
         if stage == "images":
-            detail = f" ({len(list(project.p('images').glob('scene_*.png')))})"
+            detail = f" ({len(list(project.p('06_images').glob('scene_*.png')))})"
         elif stage == "tts":
             detail = f" ({len(list(project.p('audio').glob('scene_*.wav')))})"
         print(f"  {stage:<9} {status}{detail}")
-    finals = sorted(project.p("final").glob("*.mp4"))
+    finals = sorted(project.root.glob("07_*.mp4"))
     if finals:
         print(f"final:   {finals[0]} ({human_size(finals[0].stat().st_size)})")
     return 0

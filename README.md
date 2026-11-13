@@ -11,7 +11,7 @@ A DSH skill that turns a video, video URL, article URL, PDF, or plain text into 
 1. Ingests local video/audio, YouTube/Bilibili URLs, article URLs, PDFs, or text.
 2. Transcribes video with Qwen3-ASR (MLX).
 3. Cleans the source into Markdown, then writes a timed narration script.
-4. Generates a title, description, and exactly 10 tags for `metadata.json`.
+4. Generates a title, description, and exactly 10 tags for `04_metadata.json`.
 5. Writes orientation-aware image prompts and generates one image per scene through ModelScope.
 6. Generates one TTS clip per scene with Qwen3-TTS (MLX), fixed seed and optional reference audio.
 7. Composes scene clips with ffmpeg, concatenates them, names the result from `metadata.title`, and removes intermediates.
@@ -73,17 +73,17 @@ python3 scripts/vcs.py compose --project <project>
 ```text
 projects/
 └── YouTube_11122026_<metadata title>/
-    ├── transcript.raw.txt
-    ├── transcript.md
-    ├── script.json
-    ├── image_prompts.json
-    ├── metadata.json
-    ├── images/
-    ├── final/<metadata title>.mp4
+    ├── 01_transcript.raw.txt
+    ├── 02_transcript.md
+    ├── 03_script.json
+    ├── 04_metadata.json
+    ├── 05_image_prompts.json
+    ├── 06_images/
+    ├── 07_<metadata title>.mp4
     └── source/<original>.pdf   # PDF input only
 ```
 
-Audio, scene clips, logs, and temporary files are removed after `compose` by default; pass `--keep-intermediates` to keep them. `metadata.json` records the source type, platform or domain, original URL, syndicated URL, or copied PDF path.
+Audio, scene clips, logs, and temporary files are removed after `compose` by default; pass `--keep-intermediates` to keep them. `04_metadata.json` records the source type, platform or domain, original URL, syndicated URL, or copied PDF path.
 
 ## Notes and limits
 

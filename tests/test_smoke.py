@@ -36,7 +36,7 @@ class SmokeTest(unittest.TestCase):
                 "--orientation", "portrait", "--out", str(out),
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
-            finals = list((out / "final").glob("*.mp4"))
+            finals = list(out.glob("07_*.mp4"))
             self.assertEqual(len(finals), 1, proc.stdout)
             video = finals[0]
             self.assertGreater(video.stat().st_size, 100_000)
@@ -109,7 +109,7 @@ class SmokeTest(unittest.TestCase):
                 out = Path(tmp) / "project"
                 proc = self.run_vcs("init", "--duration", "1", "--out", str(out))
                 self.assertEqual(proc.returncode, 0, proc.stderr)
-                (out / "transcript.raw.txt").write_text("raw text. " * 200, encoding="utf-8")
+                (out / "01_transcript.raw.txt").write_text("raw text. " * 200, encoding="utf-8")
                 port = server.server_address[1]
                 providers = {
                     "text": [
@@ -120,7 +120,7 @@ class SmokeTest(unittest.TestCase):
                 (out / "providers.json").write_text(json.dumps(providers), encoding="utf-8")
                 proc = self.run_vcs("text", "--project", str(out), "--stage", "cleanup")
                 self.assertEqual(proc.returncode, 0, proc.stderr)
-                self.assertTrue((out / "transcript.md").exists())
+                self.assertTrue((out / "02_transcript.md").exists())
                 self.assertEqual(calls[0], "/bad/v1/chat/completions")
                 self.assertEqual(calls[1], "/good/v1/chat/completions")
         finally:
@@ -145,9 +145,10 @@ class SmokeTest(unittest.TestCase):
             self.assertFalse((folder / "audio").exists())
             self.assertFalse((folder / "clips").exists())
             self.assertFalse((folder / "logs").exists())
-            finals = list((folder / "final").glob("*.mp4"))
+            self.assertFalse((folder / "final").exists())
+            finals = list(folder.glob("07_*.mp4"))
             self.assertEqual(len(finals), 1)
-            metadata = json.loads((folder / "metadata.json").read_text(encoding="utf-8"))
+            metadata = json.loads((folder / "04_metadata.json").read_text(encoding="utf-8"))
             self.assertEqual(metadata["source"]["type"], "text")
 
     def test_source_folder_names(self) -> None:

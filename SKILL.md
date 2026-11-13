@@ -142,23 +142,23 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 ## 完整流程（已实现）
 
 1. **ingest**：本地视频/视频链接 → 抽音频；文章链接 → trafilatura；PDF → pypdf；纯文本 → 直接。
-2. **asr**：Qwen3-ASR-1.7B（MLX）转写，30 秒块切分；输出 `transcript.raw.txt`。
-3. **cleanup**：读 `references/prompts/01_cleanup.md`，写 `transcript.md`；可由 Agent 写，也可 `vcs text --stage all` 调自定义 API。
-4. **script**：读 `02_script.md` + 目标时长/分段/语速，写 `script.json`（`segments[]`，无 `parts`）。
-5. **metadata**：读 `03_metadata.md`，写 `metadata.json`（title + description + 恰好 10 个 tags）。
-6. **prompts**：按画幅读 `04_image_16x9.md` 或 `05_image_9x16.md`，写 `image_prompts.json`。
-7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`images/scene_001.png`。
+2. **asr**：Qwen3-ASR-1.7B（MLX）转写，30 秒块切分；输出 `01_transcript.raw.txt`。
+3. **cleanup**：读 `references/prompts/01_cleanup.md`，写 `02_transcript.md`；可由 Agent 写，也可 `vcs text --stage all` 调自定义 API。
+4. **script**：读 `02_script.md` + 目标时长/分段/语速，写 `03_script.json`（`segments[]`，无 `parts`）。
+5. **metadata**：读 `03_metadata.md`，写 `04_metadata.json`（title + description + 恰好 10 个 tags）。
+6. **prompts**：按画幅读 `04_image_16x9.md` 或 `05_image_9x16.md`，写 `05_image_prompts.json`。
+7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`06_images/scene_001.png`。
 8. **tts**：逐段 Qwen3-TTS-1.7B，固定 seed/采样参数；参考音可选（`--voice-ref`），`audio/scene_001.wav`。
 9. **compose**：每段图 + 音 → `clips/scene_001.mp4`，`concat -c copy` 合并；默认清理 `audio/`、`clips/`、`logs/`。
-10. **finalize**：`metadata.title` 安全化后命名成片；目录在 metadata 生成后追加标题。
+10. **finalize**：`metadata.title` 安全化后直接输出根目录 `07_<标题>.mp4`。
 
 ## Agent 模式约定
 
-- 每个文本阶段只做一件事：读对应 prompt，写目标文件，然后跑 `vcs validate --project <dir>`。
-- `script.json` 的 schema 不要改；不要写 `parts`；每段 `narration` 60–220 字（中文）。
-- `metadata.json` 的 `tags` 必须恰好 10 个；标题会作为最终文件名，避免 `/ \ : * ? " < > |`。
+- 每个文本阶段只做一件事：读对应 prompt，写目标文件，然后跑 `vcs validate --project <dir>`；文件名按 01–05 的步骤前缀。
+- `03_script.json` 的 schema 不要改；不要写 `parts`；每段 `narration` 60–220 字（中文）。
+- `04_metadata.json` 的 `tags` 必须恰好 10 个；标题会作为 `07_` 文件名的一部分，避免 `/ \ : * ? " < > |`。
 - 用户只改画幅时，只重跑 prompts/images/compose，不要重写文稿和配音。
-- 失败时先读 `logs/run.log` 与 `vcs status`，不要手动删除 `audio/`、`images/` 以“重来”。
+- 失败时先读 `logs/run.log` 与 `vcs status`，不要手动删除 `audio/`、`06_images/` 以“重来”。
 
 ## 输出目录格式
 
@@ -166,14 +166,14 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 projects/
 └── YouTube_11122026_英伟达最大风险，不是芯片，而是黄仁勋/
     ├── project.json
-    ├── transcript.raw.txt
-    ├── transcript.md
-    ├── script.json
-    ├── image_prompts.json
-    ├── metadata.json          # 含 source
-    ├── images/scene_001.png
+    ├── 01_transcript.raw.txt
+    ├── 02_transcript.md
+    ├── 03_script.json
+    ├── 04_metadata.json       # 含 source
+    ├── 05_image_prompts.json
+    ├── 06_images/scene_001.png
+    ├── 07_<标题>.mp4          # 最终成片，直接在根目录
     ├── source/xxx.pdf         # 仅 PDF 保留
-    ├── final/<标题>.mp4
     └── state.json
 ```
 
@@ -182,14 +182,14 @@ projects/
 - 第三段：metadata 生成后追加标题；改标题后跑 `vcs rename --project ...`。
 - `--out` 显式指定目录时不自动改名；可用 `vcs rename` 迁移。
 - `compose` 默认删除 `audio/`、`clips/`、`logs/`、临时文件；`--keep-intermediates` 可保留。也可单独跑 `vcs clean`。
-- `metadata.json.source` 记录：`type`、`label`、`platform`、`domain`、`url`、`syndicated_url`、`file`。
+- `04_metadata.json.source` 记录：`type`、`label`、`platform`、`domain`、`url`、`syndicated_url`、`file`。
 
 ## 质量检查
 
 - `ffprobe`：竖屏 1080×1920 / 横屏 1920×1080，30fps，h264 + aac。
 - 总时长 ≈ 各段音频之和；单段结尾不被截断（TTS 尾部静音 350ms）。
 - 图片尺寸正确、无文字/水印/分屏；同一视频风格一致。
-- 最终文件名 = `metadata.title` 安全化结果。
+- 最终文件名 = `07_` + `metadata.title` 安全化结果，直接在项目根目录。
 - 音色：同一参考音（若提供）、同一 seed；段间 250–350ms 留白。
 
 ## 故障排查

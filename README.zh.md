@@ -9,7 +9,7 @@
 1. 接收本地视频/音频、YouTube/Bilibili 链接、文章链接、PDF 或文本。
 2. 视频用 Qwen3-ASR（MLX）转写。
 3. 把素材整理成 Markdown 文稿，再写成带时长控制的口播稿。
-4. 生成有吸引力的标题、简介和恰好 10 个 tags，写入 `metadata.json`。
+4. 生成有吸引力的标题、简介和恰好 10 个 tags，写入 `04_metadata.json`。
 5. 按横屏/竖屏生成构图不同的配图 Prompt，并通过魔搭 ModelScope 逐段生图。
 6. 用 Qwen3-TTS（MLX）逐段配音；固定 seed，参考音可选。
 7. 用 ffmpeg 逐段合成、concat 合并，按 `metadata.title` 命名，并清理中间文件。
@@ -69,17 +69,17 @@ python3 scripts/vcs.py compose --project <项目目录>
 ```text
 projects/
 └── YouTube_11122026_<metadata 标题>/
-    ├── transcript.raw.txt
-    ├── transcript.md
-    ├── script.json
-    ├── image_prompts.json
-    ├── metadata.json
-    ├── images/
-    ├── final/<metadata 标题>.mp4
+    ├── 01_transcript.raw.txt
+    ├── 02_transcript.md
+    ├── 03_script.json
+    ├── 04_metadata.json
+    ├── 05_image_prompts.json
+    ├── 06_images/
+    ├── 07_<metadata 标题>.mp4
     └── source/<原文件>.pdf   # 仅 PDF 输入保留
 ```
 
-`compose` 完成后默认删除 `audio/`、`clips/`、`logs/` 和临时文件；加 `--keep-intermediates` 可保留。`metadata.json` 会记录来源类型、平台或域名、原始 URL、转载 URL，或 PDF 文件路径。
+`compose` 完成后默认删除 `audio/`、`clips/`、`logs/` 和临时文件；加 `--keep-intermediates` 可保留。`04_metadata.json` 会记录来源类型、平台或域名、原始 URL、转载 URL，或 PDF 文件路径。
 
 ## 注意与限制
 
