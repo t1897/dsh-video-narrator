@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Video Narrator",
+    "description": "Turns a video, article, PDF, or text into a narrated video with per-scene images, TTS, metadata, and ordered fallback across multiple text and image APIs."
+  }
+}

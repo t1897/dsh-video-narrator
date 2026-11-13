@@ -1,0 +1,33 @@
+{
+  "name": "dsh-video-narrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turns a video, article, PDF, or text into a narrated video with images, TTS, metadata, and ordered API fallback.",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "SKILL.md",
+    "scripts",
+    "references",
+    "assets",
+    "providers.example.json",
+    ".env.example",
+    "locale",
+    "icon.svg",
+    "screenshots.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

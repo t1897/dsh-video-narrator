@@ -1,0 +1,52 @@
+{
+  "text": [
+    {
+      "name": "agent",
+      "provider": "agent"
+    },
+    {
+      "name": "openai-primary",
+      "provider": "openai",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "VCS_LLM_1_KEY",
+      "model": "gpt-4o-mini"
+    },
+    {
+      "name": "deepseek-backup",
+      "provider": "openai",
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "VCS_LLM_2_KEY",
+      "model": "deepseek-chat"
+    },
+    {
+      "name": "custom-backup",
+      "provider": "openai",
+      "base_url": "https://your-endpoint.example.com/v1",
+      "api_key_env": "VCS_LLM_3_KEY",
+      "model": "your-model"
+    }
+  ],
+  "image": [
+    {
+      "name": "modelscope-cn-1",
+      "provider": "modelscope",
+      "base_url": "https://api-inference.modelscope.cn",
+      "api_key_env": "VCS_MODELSCOPE_CN_KEY",
+      "model": "Tongyi-MAI/Z-Image-Turbo"
+    },
+    {
+      "name": "modelscope-cn-2",
+      "provider": "modelscope",
+      "base_url": "https://api-inference.modelscope.cn",
+      "api_key_env": "VCS_MODELSCOPE_CN_KEY_2",
+      "model": "Tongyi-MAI/Z-Image-Turbo"
+    },
+    {
+      "name": "modelscope-intl-1",
+      "provider": "modelscope",
+      "base_url": "https://api-inference.modelscope.ai",
+      "api_key_env": "VCS_MODELSCOPE_INTL_KEY",
+      "model": "Tongyi-MAI/Z-Image-Turbo"
+    }
+  ]
+}
