@@ -7,15 +7,36 @@ description: 把视频、视频链接、文章链接、PDF 或纯文本转成带
 
 把「素材」变成「可发布的口播视频」：文稿 → 分段口播稿 → 标题/标签 → 逐段配图 + 配音 → ffmpeg 合成 → 按标题命名。
 
+## 强制：开始前先弹参数确认
+
+**这是本 Skill 的第一步，优先于下面所有步骤。** 在任何 `ingest` / `asr` / `text` / `images` / `tts` / `compose`、写文件或创建项目之前，必须先调用 `ask_user_question`，和用户确认参数。
+
+一次性问这 4 项：
+
+| id | 问题 | 选项（默认在前） |
+|---|---|---|
+| `orientation` | 画幅？ | 竖屏 9:16（默认）/ 横屏 16:9 / 自定义宽高 |
+| `duration` | 视频时长？ | 固定 6 分钟（默认）/ 3–5 分钟 / 5–8 分钟 / 不限 / 自定义 |
+| `segment` | 每段多少秒？ | 20–40 秒（默认）/ 25–35 秒 / 自定义 |
+| `voice` | 音色和风格？ | female（Tina，默认）/ male（hugo）/ 自定义参考音；风格 cinematic（默认）/ documentary / anime |
+
+规则：
+
+- **不要跳过对话框直接开跑。** 即使用户在请求里已经写了“竖屏、5 分钟”，也要用一题汇总确认（“确认开始 / 修改参数”），不要静默采用。
+- 用户跳过某一项时用默认值，但在开始前明确复述最终参数。
+- 把答案传给 `vcs init` / `vcs ingest` / `vcs config`：`--orientation`、`--duration`、`--segment-range`、`--voice`、`--style`；自定义参考音用 `--voice-ref`（并尽量带 `--voice-ref-text`）。
+- 没有 `ask_user_question` 工具的环境（例如纯 CLI/headless），在对话中逐项询问，或让用户显式传齐参数；**不能默认静默开始**。
+- 参数确认完成后才进入“完整流程”。
+
 ## 当前实现状态
 
-**v1.0 已完成**（2026-11-12）：6 项单测通过，3 条真实成片（YouTube / 文章 / PDF），支持生成前配置、多 API 回退、来源目录命名与中间文件清理。
+**v1.0 已完成**（2026-11-12）：6 项单测通过，4 条真实成片（YouTube ×2 / 文章 / PDF），支持生成前配置、多 API 回退、来源目录命名与中间文件清理。
 
 - **M0**：`doctor`、`init`、`run --mock`、`status`；mock 文本/图片/TTS + 真实 ffmpeg 合成。
 - **M1**：`ingest`（本地视频/YouTube/文章/PDF/文本）+ `asr`（Qwen3-ASR-1.7B，MLX）。
-- **M2**：Agent 直接写 `transcript.md` / `script.json` / `metadata.json` / `image_prompts.json`，`validate` 做结构、字数、时长、10 tags 校验。HTTP 文本模式尚未接入。
+- **M2**：Agent 直接写 `02_transcript.md` / `03_script.json` / `04_metadata.json` / `05_image_prompts.json`，或 `vcs text` 调多个自定义 API；`validate` 做结构、字数、时长、10 tags 校验。
 - **M3**：`images`（魔搭 ModelScope 异步 API）、`tts`（Qwen3-TTS-1.7B，MLX）、`compose`（ffmpeg 逐段 + concat + 按标题命名）。
-- 三个真实输入已跑通：YouTube 视频、Bloomberg 文章（Business Times 免费转载正文）、Foreign Affairs PDF。
+- 四个真实输入已跑通：YouTube ×2、Bloomberg 文章（Business Times 免费转载正文）、Foreign Affairs PDF。
 
 实测结果（1080×1920 / 30fps / h264+aac）：
 

@@ -48,7 +48,7 @@ python3 scripts/vcs.py providers --file providers.json
 
 ## Use
 
-Ask the agent for a video from a URL, PDF, article, or text. The skill asks for orientation, duration (fixed, range, or unlimited), segment length, voice, and style before generating.
+Ask the agent for a video from a URL, PDF, article, or text. Before doing anything, the skill opens the parameter confirmation dialog and asks for orientation, duration (fixed, range, or unlimited), segment length, voice, and style.
 
 The CLI is also usable directly:
 
@@ -59,7 +59,7 @@ python3 scripts/vcs.py ingest --input "https://www.youtube.com/watch?v=..." --or
 # transcribe video input
 HF_HOME="$HOME/.cache/vcs/hf" python3 scripts/vcs.py asr --project <project> --language English
 
-# Agent writes transcript.md / script.json / metadata.json / image_prompts.json, then:
+# Agent writes 02_transcript.md / 03_script.json / 04_metadata.json / 05_image_prompts.json, then:
 python3 scripts/vcs.py validate --project <project>
 
 # media
