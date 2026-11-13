@@ -28,7 +28,7 @@ description: 把视频、视频链接、文章链接、PDF 或纯文本转成带
 已知限制：
 - 魔搭生图需要 Key：单 Key 用 `VCS_MODELSCOPE_API_KEY`，多账号用 `providers.json` + `VCS_MODELSCOPE_CN_KEY` / `VCS_MODELSCOPE_INTL_KEY`；否则用 `--provider mock`。
 - Qwen3-TTS-1.7B 峰值内存约 9–10GB，生成 1 分钟语音约 3 倍实时。
-- 音色一致性靠固定参考音（可选，用户自备）+ seed；未提供参考音时用模型默认音色，段间会有轻微语气重置。
+- 音色一致性靠固定参考音 + seed；TTS 必须提供参考音（内置 female/male 样本或 `--voice-ref`），不再使用无参考音的默认音色。
 - 文本既可由 Agent 写，也可用 `vcs text` 调自定义 API；多个 API 按 `providers.json` 顺序回退。
 
 ## 环境
@@ -134,7 +134,7 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 | 分段 | 20–40 秒，目标 30 秒（`--segment-range` / `--segment`） |
 | 画幅 | 9:16 竖屏 1080×1920；可横屏或自定义 `--width/--height` |
 | 语言 | 中文（`--language`） |
-| 音色 | female（`--voice`）；参考音可选（`--voice-ref`）+ seed |
+| 音色 | female/male（`--voice`）；参考音必需（内置样本或 `--voice-ref`）+ seed |
 | 生图 | 魔搭 `Tongyi-MAI/Z-Image-Turbo`，质量档 `Qwen/Qwen-Image-2512` |
 | 字幕 | v1 不生成 |
 | 文本 | Agent 直接写文件；或 `vcs text` 调多个自定义 API |
@@ -148,7 +148,7 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 5. **metadata**：读 `03_metadata.md`，写 `04_metadata.json`（title + description + 恰好 10 个 tags）。
 6. **prompts**：按画幅读 `04_image_16x9.md` 或 `05_image_9x16.md`，写 `05_image_prompts.json`。
 7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`06_images/scene_001.png`。
-8. **tts**：逐段 Qwen3-TTS-1.7B，固定 seed/采样参数；参考音可选（`--voice-ref`），`audio/scene_001.wav`。
+8. **tts**：逐段 Qwen3-TTS-1.7B，固定 seed/采样参数；参考音必需（默认 `assets/voice_female.mp3` / `voice_male.mp3`，可 `--voice-ref` 覆盖），`audio/scene_001.wav`。
 9. **compose**：每段图 + 音 → `clips/scene_001.mp4`，`concat -c copy` 合并；默认清理 `audio/`、`clips/`、`logs/`。
 10. **finalize**：`metadata.title` 安全化后直接输出根目录 `07_<标题>.mp4`。
 
@@ -190,7 +190,7 @@ projects/
 - 总时长 ≈ 各段音频之和；单段结尾不被截断（TTS 尾部静音 350ms）。
 - 图片尺寸正确、无文字/水印/分屏；同一视频风格一致。
 - 最终文件名 = `07_` + `metadata.title` 安全化结果，直接在项目根目录。
-- 音色：同一参考音（若提供）、同一 seed；段间 250–350ms 留白。
+- 音色：同一参考音、同一 seed；段间 250–350ms 留白。
 
 ## 故障排查
 

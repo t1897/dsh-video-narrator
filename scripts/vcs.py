@@ -1401,7 +1401,10 @@ def tts_project(
         candidate = SKILL_ROOT / "assets" / ref_name
         ref_path = candidate if candidate.exists() else None
     if ref_path is None:
-        eprint("tts: no reference audio found; using the model's default voice")
+        raise VcsError(
+            "reference audio is required. Add voice_female.mp3/voice_male.mp3 to assets/, "
+            "or pass --voice-ref <audio> and --voice-ref-text <transcript>."
+        )
     segments = script["segments"][:limit] if limit else script["segments"]
     paths: list[Path] = []
     for index, segment in enumerate(segments, 1):

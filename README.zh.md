@@ -11,7 +11,7 @@
 3. 把素材整理成 Markdown 文稿，再写成带时长控制的口播稿。
 4. 生成有吸引力的标题、简介和恰好 10 个 tags，写入 `04_metadata.json`。
 5. 按横屏/竖屏生成构图不同的配图 Prompt，并通过魔搭 ModelScope 逐段生图。
-6. 用 Qwen3-TTS（MLX）逐段配音；固定 seed，参考音可选。
+6. 用 Qwen3-TTS（MLX）逐段配音；固定 seed，参考音必需。
 7. 用 ffmpeg 逐段合成、concat 合并，按 `metadata.title` 命名，并清理中间文件。
 
 ## 环境要求
@@ -85,7 +85,7 @@ projects/
 
 - v1 不生成字幕。
 - 生图需要自己的 ModelScope Token，不随插件分发。
-- 不包含任何声音样本。TTS 默认使用模型默认音色；也可以传 `--voice-ref` 使用你有权使用的参考音。
+- 内置两个参考音：`assets/voice_female.mp3` 和 `assets/voice_male.mp3`。TTS 始终要求参考音；换音色用 `--voice-ref` + `--voice-ref-text`。参考音不适用 MIT 许可，见 [assets/VOICE-LICENSE.md](assets/VOICE-LICENSE.md)。
 - 不实现付费墙绕过。受限文章请使用授权副本、免费转载副本，或用 `vcs ingest --html` 导入已保存页面。
 - 本地模型首次使用需下载：ASR 约 2.3GB，TTS 约 4.5GB；生图在云端运行。
 - 合成要求所有分段使用相同的编码/帧率/音频参数，脚本已统一处理。

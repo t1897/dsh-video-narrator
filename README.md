@@ -13,7 +13,7 @@ A DSH skill that turns a video, video URL, article URL, PDF, or plain text into 
 3. Cleans the source into Markdown, then writes a timed narration script.
 4. Generates a title, description, and exactly 10 tags for `04_metadata.json`.
 5. Writes orientation-aware image prompts and generates one image per scene through ModelScope.
-6. Generates one TTS clip per scene with Qwen3-TTS (MLX), fixed seed and optional reference audio.
+6. Generates one TTS clip per scene with Qwen3-TTS (MLX), fixed seed and a required reference voice.
 7. Composes scene clips with ffmpeg, concatenates them, names the result from `metadata.title`, and removes intermediates.
 
 ## Requirements
@@ -89,7 +89,7 @@ Audio, scene clips, logs, and temporary files are removed after `compose` by def
 
 - v1 does not generate subtitles.
 - Image generation needs a ModelScope token; it is not bundled.
-- No voice sample is bundled. TTS uses the model's default voice, or pass `--voice-ref` with audio you have the right to use.
+- Two reference samples are bundled: `assets/voice_female.mp3` and `assets/voice_male.mp3`. TTS always requires a reference voice; pass `--voice-ref` and `--voice-ref-text` to use a different authorized voice. The samples are not MIT-licensed; see [assets/VOICE-LICENSE.md](assets/VOICE-LICENSE.md).
 - Paywall circumvention is not implemented. For restricted articles, use an authorized copy, a free syndicated copy, or saved HTML via `vcs ingest --html`.
 - Local model sizes: ASR about 2.3 GB and TTS about 4.5 GB on first use; image generation runs remotely.
 - The compose step requires the same codec/fps/audio parameters across all scene clips; the included script enforces this.
