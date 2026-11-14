@@ -78,7 +78,7 @@ projects/
     ├── 03_script.json
     ├── 04_metadata.json
     ├── 05_image_prompts.json
-    ├── 06_images/
+    ├── 06_images/scene_001.jpg
     ├── 07_<metadata 标题>.mp4
     └── source/<原文件>.pdf   # 仅 PDF 输入保留
 ```
@@ -88,6 +88,8 @@ projects/
 ## 注意与限制
 
 - v1 不生成字幕。
+- 场景图统一输出 JPEG（`-q:v 2`），项目体积更小；旧 PNG 项目仍可合成。
+- 分辨率可选 1080p、720p 或自定义。场景图默认直接用输出分辨率（Z-Image 支持总像素 512×512–2048×2048，1920×1080 已实测）；超过上限时生图前降采样、合成时再放大。
 - 生图需要自己的 ModelScope Token，不随插件分发。
 - 内置两个参考音：`assets/voice_female.mp3` 和 `assets/voice_male.mp3`。TTS 始终要求参考音；换音色用 `--voice-ref` + `--voice-ref-text`。参考音不适用 MIT 许可，见 [assets/VOICE-LICENSE.md](assets/VOICE-LICENSE.md)。
 - 不实现付费墙绕过。受限文章请使用授权副本、免费转载副本，或用 `vcs ingest --html` 导入已保存页面。

@@ -5,7 +5,7 @@
 竖屏把 `1080:1920` 换成横屏 `1920:1080`。
 
 ```bash
-ffmpeg -y -loop 1 -framerate 30 -i images/scene_001.png \
+ffmpeg -y -loop 1 -framerate 30 -i images/scene_001.jpg \
   -i audio/scene_001.wav \
   -vf "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,crop=1080:1920,setsar=1,format=yuv420p" \
   -c:v libx264 -preset veryfast -crf 20 -profile:v high -level 4.1 \

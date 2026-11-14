@@ -82,7 +82,7 @@ projects/
     ├── 03_script.json
     ├── 04_metadata.json
     ├── 05_image_prompts.json
-    ├── 06_images/
+    ├── 06_images/scene_001.jpg
     ├── 07_<metadata title>.mp4
     └── source/<original>.pdf   # PDF input only
 ```
@@ -92,6 +92,8 @@ Audio, scene clips, logs, and temporary files are removed after `compose` by def
 ## Notes and limits
 
 - v1 does not generate subtitles.
+- Scene images are JPEG (`-q:v 2`) to keep projects small; legacy PNG projects remain readable.
+- Resolution presets are 1080p, 720p, or custom. Scene images use the same output resolution by default (Z-Image accepts 512×512–2048×2048 total pixels; 1920×1080 is tested); larger frames are scaled down for generation and upscaled at compose.
 - Image generation needs a ModelScope token; it is not bundled.
 - Two reference samples are bundled: `assets/voice_female.mp3` and `assets/voice_male.mp3`. TTS always requires a reference voice; pass `--voice-ref` and `--voice-ref-text` to use a different authorized voice. The samples are not MIT-licensed; see [assets/VOICE-LICENSE.md](assets/VOICE-LICENSE.md).
 - Paywall circumvention is not implemented. For restricted articles, use an authorized copy, a free syndicated copy, or saved HTML via `vcs ingest --html`.

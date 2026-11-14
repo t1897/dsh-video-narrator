@@ -23,6 +23,8 @@ window.__ModuleLoader__.load({
       source: '素材',
       sourceHint: 'YouTube/文章 URL、PDF 路径，或直接粘贴一段文字（可留空，让 Agent 再问）',
       orientation: '画幅',
+      resolution: '分辨率',
+      customSize: '自定义',
       portrait: '竖屏 9:16',
       landscape: '横屏 16:9',
       custom: '自定义',
@@ -77,6 +79,8 @@ window.__ModuleLoader__.load({
       source: 'Source',
       sourceHint: 'YouTube/article URL, PDF path, or paste text (leave empty to let the agent ask)',
       orientation: 'Orientation',
+      resolution: 'Resolution',
+      customSize: 'Custom',
       portrait: 'Portrait 9:16',
       landscape: 'Landscape 16:9',
       custom: 'Custom',
@@ -193,6 +197,7 @@ window.__ModuleLoader__.load({
 
       const [source, setSource] = useState('')
       const [orientation, setOrientation] = useState('portrait')
+      const [resolution, setResolution] = useState('1080x1920')
       const [width, setWidth] = useState('1080')
       const [height, setHeight] = useState('1920')
       const [durationMode, setDurationMode] = useState('fixed')
@@ -253,6 +258,7 @@ window.__ModuleLoader__.load({
       function reset() {
         setSource('')
         setOrientation('portrait')
+        setResolution('1080x1920')
         setWidth('1080')
         setHeight('1920')
         setDurationMode('fixed')
@@ -274,19 +280,11 @@ window.__ModuleLoader__.load({
         if (!project) return
         const pw = Number(project.width || 0)
         const ph = Number(project.height || 0)
-        if (project.orientation === 'landscape' && pw === 1920 && ph === 1080) {
-          setOrientation('landscape')
-          setWidth('1920')
-          setHeight('1080')
-        } else if (project.orientation === 'portrait' && pw === 1080 && ph === 1920) {
-          setOrientation('portrait')
-          setWidth('1080')
-          setHeight('1920')
-        } else {
-          setOrientation('custom')
-          setWidth(String(pw || 1080))
-          setHeight(String(ph || 1920))
-        }
+        setOrientation(pw > ph ? 'landscape' : 'portrait')
+        setWidth(String(pw || 1080))
+        setHeight(String(ph || 1920))
+        const preset = `${pw}x${ph}`
+        setResolution(['1080x1920', '720x1280', '1920x1080', '1280x720'].includes(preset) ? preset : 'custom')
         if (project.durationMode === 'range') {
           setDurationMode('range')
           setMinMinutes(String(project.durationMin ?? 5))
@@ -312,14 +310,11 @@ window.__ModuleLoader__.load({
         if (source.trim()) lines.push(`素材：${source.trim()}`)
         else lines.push('素材：待提供（请只询问素材，参数已确认）')
 
-        if (orientation === 'custom') {
-          const w = Number(width)
-          const hh = Number(height)
-          if (!Number.isFinite(w) || !Number.isFinite(hh) || w <= 0 || hh <= 0) throw new Error(t('errorWidth'))
-          lines.push(`画幅：自定义 ${Math.round(w)}x${Math.round(hh)}`)
-        } else {
-          lines.push(orientation === 'landscape' ? '画幅：横屏 16:9（1920x1080）' : '画幅：竖屏 9:16（1080x1920）')
-        }
+        const outW = Number(width)
+        const outH = Number(height)
+        if (!Number.isFinite(outW) || !Number.isFinite(outH) || outW <= 0 || outH <= 0) throw new Error(t('errorWidth'))
+        lines.push(orientation === 'landscape' ? '画幅：横屏 16:9' : '画幅：竖屏 9:16')
+        lines.push(`分辨率：${Math.round(outW)}x${Math.round(outH)}`)
 
         if (durationMode === 'fixed') {
           const value = Number(minutes)
@@ -416,12 +411,39 @@ window.__ModuleLoader__.load({
               })),
               field(t('orientation'), h('select', {
                 className: 'vcn-select', value: orientation,
-                onChange: (event) => setOrientation(event.target.value),
+                onChange: (event) => {
+                  const value = event.target.value
+                  setOrientation(value)
+                  const allowed = value === 'landscape' ? ['1920x1080', '1280x720'] : ['1080x1920', '720x1280']
+                  if (!allowed.includes(resolution)) {
+                    const next = allowed[0]
+                    const [w, h] = next.split('x')
+                    setResolution(next)
+                    setWidth(w)
+                    setHeight(h)
+                  }
+                },
               },
                 h('option', { value: 'portrait' }, t('portrait')),
-                h('option', { value: 'landscape' }, t('landscape')),
-                h('option', { value: 'custom' }, t('custom')))),
-              orientation === 'custom' ? field('', h(React.Fragment, null,
+                h('option', { value: 'landscape' }, t('landscape')))),
+              field(t('resolution'), h('select', {
+                className: 'vcn-select', value: resolution,
+                onChange: (event) => {
+                  const value = event.target.value
+                  setResolution(value)
+                  if (value !== 'custom') {
+                    const [w, h] = value.split('x')
+                    setWidth(w)
+                    setHeight(h)
+                  }
+                },
+              },
+                (orientation === 'landscape'
+                  ? [['1920x1080', '1920×1080'], ['1280x720', '1280×720']]
+                  : [['1080x1920', '1080×1920'], ['720x1280', '720×1280']]
+                ).map(([value, label]) => h('option', { value, key: value }, label)),
+                h('option', { value: 'custom' }, t('customSize')))),
+              resolution === 'custom' ? field('', h(React.Fragment, null,
                 h('input', { className: 'vcn-input', type: 'number', min: 1, value: width, 'aria-label': t('width'), onChange: (event) => setWidth(event.target.value) }),
                 h('span', { className: 'vcn-help' }, '×'),
                 h('input', { className: 'vcn-input', type: 'number', min: 1, value: height, 'aria-label': t('height'), onChange: (event) => setHeight(event.target.value) }),

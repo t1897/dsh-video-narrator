@@ -452,6 +452,39 @@ def _source_label(input_path: str | None, input_type: str, mock: bool) -> str:
     return "Text"
 
 
+def image_size_for(width: int, height: int) -> str:
+    """Pick a Z-Image-compatible size that matches the output aspect.
+
+    Z-Image accepts 512*512 through 2048*2048 total pixels.  For common
+    1080p/720p outputs we pass the exact frame size; larger/custom frames are
+    scaled down to the model's max edge and then upscaled by ffmpeg at compose.
+    """
+    w, h = max(1, int(width)), max(1, int(height))
+    total = w * h
+    min_total = 512 * 512
+    max_total = 2048 * 2048
+    if total < min_total:
+        scale = (min_total / total) ** 0.5
+        w, h = int(w * scale), int(h * scale)
+        total = w * h
+    if total > max_total or max(w, h) > 2048:
+        scale = min(1.0, 2048 / max(w, h), (max_total / total) ** 0.5)
+        w, h = int(w * scale), int(h * scale)
+    w = max(2, w // 2 * 2)
+    h = max(2, h // 2 * 2)
+    return f"{w}x{h}"
+
+
+def scene_image_path(project: "Project", scene_id: int) -> Path:
+    """Return the existing scene image, preferring JPEG over legacy PNG."""
+    image_dir = project.p("06_images")
+    for suffix in (".jpg", ".jpeg", ".png"):
+        path = image_dir / f"scene_{scene_id:03d}{suffix}"
+        if path.exists():
+            return path
+    return image_dir / f"scene_{scene_id:03d}.jpg"
+
+
 def build_config(args: argparse.Namespace, *, input_path: str | None, mock: bool) -> dict[str, Any]:
     mode, duration_min, duration_max = _parse_duration(args)
     if mode == "fixed":
@@ -471,7 +504,7 @@ def build_config(args: argparse.Namespace, *, input_path: str | None, mock: bool
         width, height = 1080, 1920
     else:
         width, height = 1920, 1080
-    image_size = "928x1664" if height >= width else "1664x928"
+    image_size = image_size_for(width, height)
 
     config = {
         "version": 1,
@@ -1281,7 +1314,13 @@ def images_project(
         raise VcsError("05_image_prompts.json is missing or invalid; run `vcs validate` first")
     provider = provider or project.config.get("providers", {}).get("image", "modelscope")
     orientation = project.config.get("orientation", "portrait")
-    size = project.config.get("image_size") or ("928x1664" if orientation == "portrait" else "1664x928")
+    legacy_sizes = {"928x1664", "1664x928"}
+    size = project.config.get("image_size")
+    if not size or size in legacy_sizes:
+        size = image_size_for(
+            int(project.config.get("width") or (1080 if orientation == "portrait" else 1920)),
+            int(project.config.get("height") or (1920 if orientation == "portrait" else 1080)),
+        )
     negative = prompts.get("negative", "")
     image_dir = project.p("06_images")
     image_dir.mkdir(parents=True, exist_ok=True)
@@ -1301,11 +1340,16 @@ def images_project(
 
     def generate(scene: dict[str, Any]) -> Path:
         scene_id = int(scene["id"])
-        path = image_dir / f"scene_{scene_id:03d}.png"
+        path = image_dir / f"scene_{scene_id:03d}.jpg"
+        want = tuple(int(v) for v in size.split("x"))
         if path.exists() and path.stat().st_size > 1024:
-            return path
+            try:
+                if ffprobe_size(path) == want:
+                    return path
+            except VcsError:
+                pass
         if provider == "mock":
-            width, height = (928, 1664) if orientation == "portrait" else (1664, 928)
+            width, height = (int(project.config.get("width") or 1080), int(project.config.get("height") or 1920))
             mock_image(path, width, height, scene_id)
         else:
             last_error: Exception | None = None
@@ -1318,11 +1362,20 @@ def images_project(
                 base = str(profile.get("base_url") or os.environ.get("VCS_MODELSCOPE_BASE_URL") or "https://api-inference.modelscope.cn")
                 model = str(profile.get("model") or project.config.get("models", {}).get("image") or DEFAULTS["image_model"])
                 try:
+                    tmp = image_dir / f".scene_{scene_id:03d}.download"
                     _modelscope_image(
-                        str(scene["prompt"]), str(negative), path,
+                        str(scene["prompt"]), str(negative), tmp,
                         api_key=key, base_url=base, model=model, size=size,
                         seed=int(scene.get("seed") or 1000 + scene_id),
                     )
+                    want = tuple(int(v) for v in size.split("x"))
+                    run([
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(tmp),
+                        "-vf", f"scale={want[0]}:{want[1]}:force_original_aspect_ratio=increase:flags=lanczos,"
+                               f"crop={want[0]}:{want[1]},setsar=1",
+                        "-frames:v", "1", "-q:v", "2", str(path),
+                    ])
+                    tmp.unlink(missing_ok=True)
                     last_error = None
                     break
                 except Exception as exc:  # noqa: BLE001 - try the next account/key
@@ -1336,14 +1389,7 @@ def images_project(
         width, height = ffprobe_size(path)
         want = tuple(int(v) for v in size.split("x"))
         if (width, height) != want:
-            tmp = path.with_suffix(".resized.png")
-            run([
-                "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(path),
-                "-vf", f"scale={want[0]}:{want[1]}:force_original_aspect_ratio=increase:flags=lanczos,"
-                       f"crop={want[0]}:{want[1]},setsar=1",
-                "-frames:v", "1", str(tmp),
-            ])
-            tmp.replace(path)
+            raise VcsError(f"image size mismatch: {path} is {width}x{height}, expected {size}")
         return path
 
     paths: list[Path] = []
@@ -1481,7 +1527,7 @@ def compose_project(project: Project, *, keep_intermediates: bool = False) -> Pa
     clips: list[Path] = []
     for segment in script["segments"]:
         scene_id = int(segment["id"])
-        image = project.p("06_images", f"scene_{scene_id:03d}.png")
+        image = scene_image_path(project, scene_id)
         audio = project.p("audio", f"scene_{scene_id:03d}.wav")
         for need in (image, audio):
             if not need.exists():
@@ -1655,12 +1701,11 @@ def run_pipeline(project: Project, *, mock: bool) -> Path:
     image_dir = project.p("06_images")
     for scene in prompts["scenes"]:
         scene_id = int(scene["id"])
-        path = image_dir / f"scene_{scene_id:03d}.png"
+        path = image_dir / f"scene_{scene_id:03d}.jpg"
         if not path.exists():
-            mock_image(path, 720 if config["orientation"] == "portrait" else 1280,
-                       1280 if config["orientation"] == "portrait" else 720, scene_id)
-    project.mark("images", sorted(image_dir.glob("scene_*.png")), provider="mock")
-    eprint(f"[4/6] images: {len(list(image_dir.glob('scene_*.png')))}")
+            mock_image(path, int(config["width"]), int(config["height"]), scene_id)
+    project.mark("images", sorted(image_dir.glob("scene_*.jpg")), provider="mock")
+    eprint(f"[4/6] images: {len(list(image_dir.glob('scene_*.jpg')))}")
 
     # 5. tts
     audio_dir = project.p("audio")
@@ -1677,7 +1722,7 @@ def run_pipeline(project: Project, *, mock: bool) -> Path:
     clips = []
     for segment in script["segments"]:
         scene_id = int(segment["id"])
-        image = image_dir / f"scene_{scene_id:03d}.png"
+        image = scene_image_path(project, scene_id)
         audio = audio_dir / f"scene_{scene_id:03d}.wav"
         clip = project.p("clips", f"scene_{scene_id:03d}.mp4")
         if not clip.exists():
@@ -1781,7 +1826,7 @@ def cmd_config(args: argparse.Namespace) -> int:
         cfg["fps"] = int(args.fps)
         cfg.setdefault("ffmpeg", {})["gop"] = int(args.fps) * 2
         changed.add("fps")
-    cfg["image_size"] = "928x1664" if int(cfg["height"]) >= int(cfg["width"]) else "1664x928"
+    cfg["image_size"] = image_size_for(int(cfg["width"]), int(cfg["height"]))
 
     if args.duration or args.unlimited or args.minutes is not None:
         probe = argparse.Namespace(
@@ -1949,7 +1994,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         status = row.get("status", "pending")
         detail = ""
         if stage == "images":
-            detail = f" ({len(list(project.p('06_images').glob('scene_*.png')))})"
+            detail = f" ({sum(1 for p in project.p('06_images').glob('scene_*') if p.suffix.lower() in {'.jpg', '.jpeg', '.png'})})"
         elif stage == "tts":
             detail = f" ({len(list(project.p('audio').glob('scene_*.wav')))})"
         print(f"  {stage:<9} {status}{detail}")

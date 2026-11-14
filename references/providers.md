@@ -62,7 +62,8 @@
 - 国内：`https://api-inference.modelscope.cn`；国际：`https://api-inference.modelscope.ai`。
 - Endpoint：`/v1/images/generations`；Header：`Authorization: Bearer <key>`、`Content-Type: application/json`、`X-ModelScope-Async-Mode: true`。
 - Payload：`{"model", "prompt", "size", "negative_prompt", "seed"}`；`size` 是字符串 `WxH`。
-- 尺寸：竖屏 `928x1664`（9:16）、横屏 `1664x928`（16:9）；Qwen-Image-2512 同尺寸。
+- 尺寸：默认直接用输出分辨率（如 `1080x1920` / `1920x1080`）。Z-Image 支持总像素 `512*512`–`2048*2048`；实测 `1920x1080` 可用。超过 2048 或总像素上限时自动降采样到最长边 2048，合成时再放大。
+- 输出统一转 JPEG（`-q:v 2`），保留 `.png` 兼容旧项目；不再默认生成大体积 PNG。
 - 返回 `task_id` → 轮询 `/v1/tasks/{task_id}`（header `X-ModelScope-Task-Type: image_generation`），`task_status=SUCCEED` 后下载 `output_images[0]`。
 - 轮询间隔 15 秒；单任务 600 秒超时；并发 3–4；失败换下一个 profile。
 - 提示词用英文；negative 固定：`text, watermark, logo, split screen, collage, deformed hands, extra fingers, oversaturated`。

@@ -55,6 +55,9 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(streams["video"]["height"], 1920)
             self.assertIn("audio", streams)
             self.assertGreater(float(data["format"]["duration"]), 5)
+            images = list((out / "06_images").glob("scene_*.jpg"))
+            self.assertTrue(images, "expected JPEG scene images")
+            self.assertFalse(list((out / "06_images").glob("scene_*.png")))
 
             state = json.loads((out / "state.json").read_text(encoding="utf-8"))
             self.assertEqual(state["stages"]["finalize"]["status"], "done")
@@ -72,6 +75,7 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual((config["duration_min"], config["duration_max"]), (5.0, 8.0))
             self.assertEqual(config["segment_seconds"], [25, 35])
             self.assertEqual((config["width"], config["height"]), (1920, 1080))
+            self.assertEqual(config["image_size"], "1920x1080")
 
             proc = self.run_vcs("config", "--project", str(out), "--duration", "unlimited")
             self.assertEqual(proc.returncode, 0, proc.stderr)

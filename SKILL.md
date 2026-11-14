@@ -170,7 +170,7 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 4. **script**：读 `02_script.md` + 目标时长/分段/语速，写 `03_script.json`（`segments[]`，无 `parts`）。
 5. **metadata**：读 `03_metadata.md`，写 `04_metadata.json`（title + description + 恰好 10 个 tags）。
 6. **prompts**：按画幅读 `04_image_16x9.md` 或 `05_image_9x16.md`，写 `05_image_prompts.json`。
-7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`06_images/scene_001.png`。
+7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`06_images/scene_001.jpg`。
 8. **tts**：逐段 Qwen3-TTS-1.7B，固定 seed/采样参数；参考音必需（默认 `assets/voice_female.mp3` / `voice_male.mp3`，可 `--voice-ref` 覆盖），`audio/scene_001.wav`。
 9. **compose**：每段图 + 音 → `clips/scene_001.mp4`，`concat -c copy` 合并；默认清理 `audio/`、`clips/`、`logs/`。
 10. **finalize**：`metadata.title` 安全化后直接输出根目录 `07_<标题>.mp4`。
@@ -180,7 +180,8 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 - 每个文本阶段只做一件事：读对应 prompt，写目标文件，然后跑 `vcs validate --project <dir>`；文件名按 01–05 的步骤前缀。
 - `03_script.json` 的 schema 不要改；不要写 `parts`；每段 `narration` 60–220 字（中文）。
 - `04_metadata.json` 的 `tags` 必须恰好 10 个；标题会作为 `07_` 文件名的一部分，避免 `/ \ : * ? " < > |`。
-- 用户只改画幅时，只重跑 prompts/images/compose，不要重写文稿和配音。
+- UI 的「分辨率」会作为 `--width` / `--height` 传给 `vcs init`；生图尺寸自动跟随输出分辨率（1080p 直接请求 1920×1080 / 1080×1920，输出 JPEG）。
+- 用户只改画幅或分辨率时，只重跑 prompts/images/compose，不要重写文稿和配音。
 - 失败时先读 `logs/run.log` 与 `vcs status`，不要手动删除 `audio/`、`06_images/` 以“重来”。
 
 ## 输出目录格式
@@ -194,7 +195,7 @@ projects/
     ├── 03_script.json
     ├── 04_metadata.json       # 含 source
     ├── 05_image_prompts.json
-    ├── 06_images/scene_001.png
+    ├── 06_images/scene_001.jpg
     ├── 07_<标题>.mp4          # 最终成片，直接在根目录
     ├── source/xxx.pdf         # 仅 PDF 保留
     └── state.json

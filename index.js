@@ -58,7 +58,7 @@ function collectProjects(cwd) {
       }
       let imageCount = 0
       try {
-        imageCount = readdirSync(join(projectDir, '06_images')).filter((entry) => entry.endsWith('.png')).length
+        imageCount = readdirSync(join(projectDir, '06_images')).filter((entry) => /\.(jpe?g|png)$/i.test(entry)).length
       } catch {
         imageCount = 0
       }
