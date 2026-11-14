@@ -37,7 +37,7 @@
 
 默认：`mlx-community/Qwen3-ASR-1.7B-8bit`（备选 0.6B）。
 
-- 30 秒块切分（v1 无重叠；长音频按块串行转写）。
+- 整段转写：直接把 `source.wav` 交给 Qwen3-ASR；模型内部按 20 分钟上限处理长音频，不再由 CLI 切成 30 秒块。
 - 语言 `en`/`zh` 等；热词 `--hotwords` 可选。
 - 输出 `transcript.raw.txt`。
 - 兜底：`faster-whisper large-v3-turbo`（CPU，MIT）。

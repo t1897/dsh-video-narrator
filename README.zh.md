@@ -48,18 +48,20 @@ python3 scripts/vcs.py providers --file providers.json
 
 ## 使用
 
-直接对 Agent 说要做一条口播视频即可。Skill 会**先弹出参数确认对话框**，确认画幅、时长（固定/范围/不限）、每段秒数、音色和风格后才开始生成。
+直接对 Agent 说要做一条口播视频即可。Skill 会**先弹出参数确认对话框**，确认画幅、时长（固定/范围/不限）、每段秒数、分辨率、音色和风格。确认后只执行**一条 `vcs auto`**，Agent 不参与逐阶段写文件或调度。
 
 也可以直接用 CLI：
 
 ```bash
-# 采集
-python3 scripts/vcs.py ingest --input "https://www.youtube.com/watch?v=..." --orientation portrait --duration 5-8
+# 一键本地流水线：采集 -> 整段 ASR -> 4 次文本 API -> 生图 -> TTS -> 合成
+python3 scripts/vcs.py auto \
+  --input "https://www.youtube.com/watch?v=..." \
+  --orientation portrait --duration 5-8 \
+  --providers providers.json
 
-# 视频输入需要转写
+# 单阶段调试（不是默认流程）
+python3 scripts/vcs.py ingest --input ... --out <项目目录>
 HF_HOME="$HOME/.cache/vcs/hf" python3 scripts/vcs.py asr --project <项目目录> --language English
-
-# Agent 写入 02_transcript.md / 03_script.json / 04_metadata.json / 05_image_prompts.json 后校验
 python3 scripts/vcs.py validate --project <项目目录>
 
 # 媒体生成

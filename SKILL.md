@@ -28,15 +28,54 @@ description: 把视频、视频链接、文章链接、PDF 或纯文本转成带
 - 把答案传给 `vcs init` / `vcs ingest` / `vcs config`：`--orientation`、`--duration`、`--segment-range`、`--voice`、`--style`；自定义参考音用 `--voice-ref`（并尽量带 `--voice-ref-text`）。
 - 没有 `ask_user_question` 工具的环境（例如纯 CLI/headless），在对话中逐项询问，或让用户显式传齐参数；**不能默认静默开始**。
 - 如果用户消息包含 `[VCS_PARAMS_CONFIRMED]`（来自左侧边栏的“视频”工作台面板），说明参数已经通过 UI 确认：**不要再调用 `ask_user_question`**，复述一次参数后直接开始；只有素材缺失时才问素材。
-- 参数确认完成后才进入“完整流程”。
+- 参数确认完成后直接执行 `vcs auto`；不要进入逐阶段手工流程。
+
+## 默认执行：一条 `vcs auto`
+
+参数确认后，**只执行一条命令**，然后把结果汇报给用户：
+
+```bash
+python3 scripts/vcs.py auto \
+  --input "<URL / PDF / 文本路径>" \
+  --out "<项目目录>" \
+  --orientation portrait|landscape \
+  --duration 6|5-8|unlimited \
+  --segment-range 20-40 \
+  --width 1080 --height 1920 \
+  --voice female|male \
+  --style cinematic \
+  --providers providers.json
+```
+
+`vcs auto` 在同一个进程里依次完成：
+
+1. `ingest`：下载/抽取素材；
+2. `asr`：整段音频交给 Qwen3-ASR，**不按 30 秒切块**，只返回一份 `01_transcript.raw.txt`；
+3. `text cleanup`：把整份 raw transcript 一次性交给 `providers.json` 里指定的文本模型；
+4. `text script`：把整理后的 Markdown 一次性交给同一个文本模型，产出 `03_script.json`；
+5. `text metadata`：一次调用产出标题/简介/10 tags；
+6. `text prompts`：把**全部片段**一次性交给文本模型，产出所有配图 Prompt；
+7. `images`：按输出分辨率逐段调 ModelScope，不经过 Agent；
+8. `tts`：逐段本地 Qwen3-TTS，不经过 Agent；
+9. `compose`：ffmpeg 合成、清理中间文件。
+
+**Agent 不要逐阶段读写文件，不要在每个阶段之间调用自己的模型。** ASR、TTS、ffmpeg、图片下载都是本地/API 操作；只有 cleanup/script/metadata/prompts 这 4 个文本阶段调用你指定的 LLM，每个阶段只调用一次。
+
+失败时：
+
+- 先看 `vcs status --project <dir>` 和 `logs/run.log`；
+- 修配置/Key 后重新跑 `vcs auto`（已存在的阶段会复用）；
+- 不要把流程改回“Agent 手工写稿 + 每段调用”。
+
+只有调试单个阶段时，才使用下面的 `vcs ingest/asr/text/images/tts/compose` 子命令。
 
 ## 当前实现状态
 
 **v1.0 已完成**（2026-11-12）：6 项单测通过，4 条真实成片（YouTube ×2 / 文章 / PDF），支持生成前配置、多 API 回退、来源目录命名与中间文件清理。
 
 - **M0**：`doctor`、`init`、`run --mock`、`status`；mock 文本/图片/TTS + 真实 ffmpeg 合成。
-- **M1**：`ingest`（本地视频/YouTube/文章/PDF/文本）+ `asr`（Qwen3-ASR-1.7B，MLX）。
-- **M2**：Agent 直接写 `02_transcript.md` / `03_script.json` / `04_metadata.json` / `05_image_prompts.json`，或 `vcs text` 调多个自定义 API；`validate` 做结构、字数、时长、10 tags 校验。
+- **M1**：`ingest`（本地视频/YouTube/文章/PDF/文本）+ `asr`（Qwen3-ASR-1.7B，MLX，整段转写）。
+- **M2**：`vcs auto` 默认通过 `vcs text` 调用自定义 API；cleanup/script/metadata/prompts 各一次调用；也保留人工写文件作为调试后备。`validate` 做结构、字数、时长、10 tags 校验。
 - **M3**：`images`（魔搭 ModelScope 异步 API）、`tts`（Qwen3-TTS-1.7B，MLX）、`compose`（ffmpeg 逐段 + concat + 按标题命名）。
 - 四个真实输入已跑通：YouTube ×2、Bloomberg 文章（Business Times 免费转载正文）、Foreign Affairs PDF。
 
@@ -52,7 +91,7 @@ description: 把视频、视频链接、文章链接、PDF 或纯文本转成带
 - 魔搭生图需要 Key：单 Key 用 `VCS_MODELSCOPE_API_KEY`，多账号用 `providers.json` + `VCS_MODELSCOPE_CN_KEY` / `VCS_MODELSCOPE_INTL_KEY`；否则用 `--provider mock`。
 - Qwen3-TTS-1.7B 峰值内存约 9–10GB，生成 1 分钟语音约 3 倍实时。
 - 音色一致性靠固定参考音 + seed；TTS 必须提供参考音（内置 female/male 样本或 `--voice-ref`），不再使用无参考音的默认音色。
-- 文本既可由 Agent 写，也可用 `vcs text` 调自定义 API；多个 API 按 `providers.json` 顺序回退。
+- 默认 `vcs auto` 调自定义 API；多个 API 按 `providers.json` 顺序回退。Agent 只负责发起一条命令和处理失败，不参与逐阶段生成。
 
 ## 环境
 
@@ -162,14 +201,14 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 | 字幕 | v1 不生成 |
 | 文本 | Agent 直接写文件；或 `vcs text` 调多个自定义 API |
 
-## 完整流程（已实现）
+## `vcs auto` 内部步骤（已实现）
 
 1. **ingest**：本地视频/视频链接 → 抽音频；文章链接 → trafilatura；PDF → pypdf；纯文本 → 直接。
-2. **asr**：Qwen3-ASR-1.7B（MLX）转写，30 秒块切分；输出 `01_transcript.raw.txt`。
-3. **cleanup**：读 `references/prompts/01_cleanup.md`，写 `02_transcript.md`；可由 Agent 写，也可 `vcs text --stage all` 调自定义 API。
+2. **asr**：Qwen3-ASR-1.7B（MLX）整段转写；输出 `01_transcript.raw.txt`。
+3. **cleanup**：整份 raw transcript 一次调用 `references/prompts/01_cleanup.md`，写 `02_transcript.md`（默认由 `vcs text` 完成，Agent 不手写）。
 4. **script**：读 `02_script.md` + 目标时长/分段/语速，写 `03_script.json`（`segments[]`，无 `parts`）。
 5. **metadata**：读 `03_metadata.md`，写 `04_metadata.json`（title + description + 恰好 10 个 tags）。
-6. **prompts**：按画幅读 `04_image_16x9.md` 或 `05_image_9x16.md`，写 `05_image_prompts.json`。
+6. **prompts**：全部片段一次调用 `06_image_batch.md`，写 `05_image_prompts.json`。
 7. **images**：逐段调魔搭 API（异步任务 → 轮询 → 下载），`06_images/scene_001.jpg`。
 8. **tts**：逐段 Qwen3-TTS-1.7B，固定 seed/采样参数；参考音必需（默认 `assets/voice_female.mp3` / `voice_male.mp3`，可 `--voice-ref` 覆盖），`audio/scene_001.wav`。
 9. **compose**：每段图 + 音 → `clips/scene_001.mp4`，`concat -c copy` 合并；默认清理 `audio/`、`clips/`、`logs/`。
@@ -233,4 +272,4 @@ projects/
 - `references/providers.md`：魔搭异步 API、MLX ASR/TTS、文本双模式。
 - `references/ffmpeg.md`：逐段合成、concat、横竖屏参数。
 - `references/paywalls.md`：Bloomberg 等受限站点的合规采集路径（不捆绑 BPC）。
-- `references/prompts/`：5 个文本/图片 Prompt 模板。
+- `references/prompts/`：6 个文本/图片 Prompt 模板（配图默认走批量模板）。

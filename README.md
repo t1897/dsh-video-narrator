@@ -52,7 +52,7 @@ After installation, a **Video** entry appears in the left sidebar. It opens a pe
 
 ## Use
 
-Ask the agent for a video from a URL, PDF, article, or text. Before doing anything, the skill opens the parameter confirmation dialog and asks for orientation, duration (fixed, range, or unlimited), segment length, voice, and style.
+Ask the agent for a video from a URL, PDF, article, or text. Before doing anything, the skill opens the parameter confirmation dialog and asks for orientation, duration (fixed, range, or unlimited), segment length, resolution, voice, and style. After confirmation it runs **one** `vcs auto` command; the agent does not write or orchestrate the intermediate files.
 
 The CLI is also usable directly:
 

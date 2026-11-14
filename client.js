@@ -306,7 +306,7 @@ window.__ModuleLoader__.load({
       }
 
       function buildMessage() {
-        const lines = ['使用 video-narrator 制作视频。', '[VCS_PARAMS_CONFIRMED]']
+        const lines = ['使用 video-narrator 制作视频。请直接运行 `vcs auto`，不要逐阶段手工处理。', '[VCS_PARAMS_CONFIRMED]']
         if (source.trim()) lines.push(`素材：${source.trim()}`)
         else lines.push('素材：待提供（请只询问素材，参数已确认）')
 

@@ -830,33 +830,16 @@ def transcribe_project(project: Project, *, language: str = "English", model: st
     if not wav.exists():
         raise VcsError(f"missing source audio: {wav}")
     model_id = model or project.config.get("models", {}).get("asr") or DEFAULTS["asr_model"]
-    chunk_dir = project.p("source", "chunks")
-    chunk_dir.mkdir(parents=True, exist_ok=True)
-    for old in chunk_dir.glob("chunk_*.wav"):
-        old.unlink()
-    run([
-        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav),
-        "-f", "segment", "-segment_time", "30", "-ac", "1", "-ar", "16000",
-        str(chunk_dir / "chunk_%03d.wav"),
-    ])
-    chunks = sorted(chunk_dir.glob("chunk_*.wav"))
-    if not chunks:
-        raise VcsError("audio chunking produced no files")
     os.environ.setdefault("HF_HOME", str(default_hf_home()))
     from mlx_audio.stt import load as load_stt
 
     eprint(f"asr: loading {model_id}")
     stt = load_stt(model_id)
-    texts: list[str] = []
-    for index, chunk in enumerate(chunks, 1):
-        eprint(f"asr: chunk {index}/{len(chunks)}")
-        result = stt.generate(str(chunk), language=language)
-        text = getattr(result, "text", str(result)).strip()
-        if text:
-            texts.append(text)
-    raw = "\n\n".join(texts).strip()
+    eprint("asr: transcribing full audio")
+    result = stt.generate(str(wav), language=language)
+    raw = getattr(result, "text", str(result)).strip()
     project.p("01_transcript.raw.txt").write_text(raw + "\n", encoding="utf-8")
-    project.mark("asr", [project.p("01_transcript.raw.txt")], model=model_id, language=language, chunks=len(chunks))
+    project.mark("asr", [project.p("01_transcript.raw.txt")], model=model_id, language=language, chunks=1)
     eprint(f"asr: {len(raw)} chars")
 
 
@@ -1167,23 +1150,33 @@ def text_project(project: Project, stage: str, providers_path: str | None = None
             raise VcsError("03_script.json is missing; run script first")
         script = load_json(script_path, {})
         segments = script.get("segments") or []
-        template_name = "04_image_16x9.md" if project.config.get("orientation") == "landscape" else "05_image_9x16.md"
-        template = load_prompt(template_name)
+        expected_ids = [int(segment["id"]) for segment in segments]
+        orientation = project.config.get("orientation", "portrait")
+        segments_payload = [
+            {"id": int(segment["id"]), "narration": str(segment.get("narration") or "")}
+            for segment in segments
+        ]
+        prompt = render_prompt(load_prompt("06_image_batch.md"), {
+            "orientation": "16:9 横屏（landscape）" if orientation == "landscape" else "9:16 竖屏（portrait）",
+            "style": project.config.get("style", "cinematic"),
+            "segments_json": json.dumps(segments_payload, ensure_ascii=False, indent=2),
+        })
+        result = _try_text_profiles(
+            profiles, prompt, json_mode=True,
+            transform=lambda value: _validate_prompt_batch(parse_json_response(value), expected_ids),
+        )
         scenes = []
+        by_id = {int(item["id"]): item for item in result["scenes"]}
         for segment in segments:
-            prompt = render_prompt(template, {"narration": segment.get("narration", "")})
-            result = _try_text_profiles(
-                profiles, prompt, json_mode=True,
-                transform=lambda value: _validate_prompt_shape(parse_json_response(value)),
-            )
+            scene_id = int(segment["id"])
             scenes.append({
-                "id": int(segment["id"]),
-                "prompt": result["prompt"],
-                "seed": 1000 + int(segment["id"]),
+                "id": scene_id,
+                "prompt": by_id[scene_id]["prompt"],
+                "seed": 1000 + scene_id,
             })
         data = {
             "version": 1,
-            "orientation": project.config.get("orientation", "portrait"),
+            "orientation": orientation,
             "style": project.config.get("style", "cinematic"),
             "negative": "text, letters, watermark, logo, split screen, collage, multiple panels, deformed hands, extra fingers, oversaturated, plastic skin",
             "scenes": scenes,
@@ -1212,6 +1205,26 @@ def _validate_metadata_shape(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(tags, list) or len(tags) != 10:
         raise VcsError("metadata response must contain exactly 10 tags")
     return data
+
+
+def _validate_prompt_batch(data: dict[str, Any], expected_ids: list[int]) -> dict[str, Any]:
+    scenes = data.get("scenes")
+    if not isinstance(scenes, list):
+        raise VcsError("image prompt batch must contain a scenes array")
+    by_id: dict[int, dict[str, Any]] = {}
+    for item in scenes:
+        try:
+            scene_id = int(item.get("id"))
+        except (TypeError, ValueError, AttributeError):
+            raise VcsError("image prompt batch has a scene without an integer id")
+        prompt = str(item.get("prompt") or "").strip()
+        if len(prompt.split()) < 10:
+            raise VcsError(f"image prompt for scene {scene_id} is too short")
+        by_id[scene_id] = {"id": scene_id, "prompt": prompt}
+    missing = [scene_id for scene_id in expected_ids if scene_id not in by_id]
+    if missing:
+        raise VcsError(f"image prompt batch is missing scene ids: {missing}")
+    return {"scenes": [by_id[scene_id] for scene_id in expected_ids]}
 
 
 def _validate_prompt_shape(data: dict[str, Any]) -> dict[str, Any]:
@@ -1951,6 +1964,40 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def auto_pipeline(project: Project, args: argparse.Namespace) -> Path:
+    """Run the whole local pipeline with no Agent-side stage orchestration."""
+    log_path = project.p("logs", "run.log")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(f"[{now_iso()}] start auto pipeline\n", encoding="utf-8")
+
+    ingest_project(project, args)
+    input_type = str(project.config.get("input_type") or "text")
+    if input_type == "video":
+        transcribe_project(project, language=args.language)
+    elif input_type in {"article", "pdf", "text"}:
+        eprint("asr: skipped (text input)")
+    else:
+        raise VcsError(f"auto: unsupported input type: {input_type}")
+
+    text_project(project, "all", providers_path=getattr(args, "providers", None))
+    images_project(project, providers_path=getattr(args, "providers", None))
+    tts_project(
+        project,
+        voice_ref=getattr(args, "voice_ref", None),
+        voice_ref_text=getattr(args, "voice_ref_text", None),
+    )
+    return compose_project(project, keep_intermediates=bool(getattr(args, "keep_intermediates", False)))
+
+
+def cmd_auto(args: argparse.Namespace) -> int:
+    if getattr(args, "interactive", False):
+        _interactive_config(args)
+    project = create_project(args, mock=False)
+    final = auto_pipeline(project, args)
+    print(final)
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     if getattr(args, "interactive", False):
         _interactive_config(args)
@@ -2047,6 +2094,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_init = sub.add_parser("init", help="create a project directory and config")
     add_project_args(p_init)
     p_init.set_defaults(func=cmd_init)
+
+    p_auto = sub.add_parser("auto", help="run the full pipeline locally (ASR + text APIs + images + TTS + compose)")
+    add_project_args(p_auto)
+    p_auto.add_argument("--type", choices=["auto", "video", "article", "pdf", "text"], default="auto")
+    p_auto.add_argument("--html", help="saved HTML file for a blocked article URL")
+    p_auto.add_argument("--providers", help="providers.json with ordered text/image profiles")
+    p_auto.add_argument("--voice-ref", help="optional reference audio for voice cloning")
+    p_auto.add_argument("--voice-ref-text", help="transcript of the reference audio")
+    p_auto.add_argument("--keep-intermediates", action="store_true", help="keep audio/, clips/, logs/")
+    p_auto.set_defaults(func=cmd_auto)
 
     p_run = sub.add_parser("run", help="run the pipeline")
     add_project_args(p_run)
