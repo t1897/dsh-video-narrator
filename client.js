@@ -3,16 +3,17 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useEffect, useRef, useState } = React
+    const { useEffect, useState } = React
     const NS = 'dsh-video-narrator'
 
     const zh = {
-      open: '视频工作台',
+      nav: '视频',
       title: '视频工作台',
-      subtitle: '左侧查看历史项目，右侧设置下一条视频；确认后写入输入框。',
+      subtitle: '左侧查看历史项目，右侧配置下一条视频；开始后会创建新的会话。',
+      workspace: '工作区',
       history: '历史项目',
       refresh: '刷新',
-      empty: '还没有历史项目',
+      empty: '这个工作区还没有历史项目',
       loading: '正在读取项目…',
       loadFailed: '读取历史失败',
       done: '已完成',
@@ -47,27 +48,26 @@ window.__ModuleLoader__.load({
       documentary: 'documentary',
       anime: 'anime',
       customStyle: '自定义风格',
-      cancel: '取消',
-      fill: '填入输入框',
-      send: '填入并开始',
+      start: '开始生成',
+      started: '已创建新会话，正在交给 Agent 处理。',
       errorWidth: '请输入有效的自定义宽高。',
       errorMinutes: '请输入有效的分钟数。',
       errorSegment: '每段秒数必须大于 0，且起始值不能大于结束值。',
       errorVoice: '自定义参考音需要填写文件路径。',
-      busy: '当前输入正在发送，稍后再试。',
       defaults: '恢复默认',
       selected: '已选项目',
-      close: '关闭',
       noFinal: '暂无成片',
+      noWorkspace: '没有可用工作区',
     }
 
     const en = {
-      open: 'Video workbench',
+      nav: 'Video',
       title: 'Video workbench',
-      subtitle: 'Browse projects on the left, configure the next video on the right.',
+      subtitle: 'Browse projects on the left, configure the next video on the right; starting creates a new session.',
+      workspace: 'Workspace',
       history: 'Projects',
       refresh: 'Refresh',
-      empty: 'No projects yet',
+      empty: 'No projects in this workspace yet',
       loading: 'Loading projects…',
       loadFailed: 'Could not load projects',
       done: 'Done',
@@ -102,55 +102,30 @@ window.__ModuleLoader__.load({
       documentary: 'documentary',
       anime: 'anime',
       customStyle: 'Custom style',
-      cancel: 'Cancel',
-      fill: 'Fill composer',
-      send: 'Fill and start',
+      start: 'Start',
+      started: 'New session created; handing it to the agent.',
       errorWidth: 'Enter a valid custom size.',
       errorMinutes: 'Enter a valid number of minutes.',
       errorSegment: 'Segment seconds must be positive and ordered.',
       errorVoice: 'A custom reference needs a file path.',
-      busy: 'The input is busy; try again in a moment.',
       defaults: 'Reset defaults',
       selected: 'Selected project',
-      close: 'Close',
       noFinal: 'No final video',
+      noWorkspace: 'No workspace available',
     }
 
     const css = `
-      .vcn-trigger {
-        display: inline-flex; align-items: center; gap: 6px;
-        height: 28px; padding: 0 10px; border-radius: 999px;
-        border: 1px solid var(--dsw-alias-border-l2);
-        background: var(--dsw-alias-bg-layer-1);
-        color: var(--dsw-alias-label-primary);
-        font: inherit; font-size: 12px; cursor: pointer;
-      }
-      .vcn-trigger:hover { border-color: var(--dsw-alias-brand-primary); }
-      .vcn-trigger svg { width: 13px; height: 13px; }
-      .vcn-dialog {
-        width: min(1120px, calc(100vw - 32px));
-        height: min(86vh, 860px);
-        max-height: 86vh;
-        padding: 0; overflow: hidden;
-        border: 1px solid var(--dsw-alias-border-l2);
-        border-radius: 16px;
-        background: var(--dsw-alias-bg-overlay);
-        color: var(--dsw-alias-label-primary);
-        box-shadow: 0 24px 72px rgba(0,0,0,.32);
-      }
-      .vcn-dialog::backdrop { background: rgba(0,0,0,.44); }
-      .vcn-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-      .vcn-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+      .vcn-page { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); }
+      .vcn-head { display: flex; align-items: flex-start; gap: 14px; padding: 18px 22px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
       .vcn-head-main { flex: 1; min-width: 0; }
       .vcn-title { margin: 0; font-size: 17px; font-weight: 650; }
       .vcn-sub { margin: 5px 0 0; font-size: 12px; color: var(--dsw-alias-label-secondary); line-height: 1.5; }
-      .vcn-iconbtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid transparent; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; font-size: 16px; line-height: 1; }
-      .vcn-iconbtn:hover { background: var(--dsw-alias-bg-layer-2); color: var(--dsw-alias-label-primary); }
+      .vcn-workspace { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--dsw-alias-label-secondary); flex: 0 0 auto; padding-top: 2px; }
       .vcn-main { display: flex; flex: 1; min-height: 0; }
       .vcn-aside { width: 300px; flex: 0 0 300px; border-right: 1px solid var(--dsw-alias-border-l1); display: flex; flex-direction: column; min-height: 0; background: var(--dsw-alias-bg-layer-1); }
       .vcn-aside-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 14px 9px; }
       .vcn-aside-title { font-size: 12px; font-weight: 600; color: var(--dsw-alias-label-secondary); letter-spacing: .02em; }
-      .vcn-list { flex: 1; overflow: auto; padding: 0 8px 10px; display: grid; gap: 4px; align-content: start; }
+      .vcn-list { flex: 1; overflow: auto; padding: 0 8px 12px; display: grid; gap: 4px; align-content: start; }
       .vcn-item { width: 100%; text-align: left; border: 1px solid transparent; background: transparent; color: var(--dsw-alias-label-primary); border-radius: 9px; padding: 9px 10px; cursor: pointer; font: inherit; display: grid; gap: 3px; }
       .vcn-item:hover { background: var(--dsw-alias-bg-layer-2); }
       .vcn-item.selected { background: var(--dsw-alias-bg-layer-2); border-color: var(--dsw-alias-brand-primary); }
@@ -175,7 +150,8 @@ window.__ModuleLoader__.load({
       .vcn-select { padding-right: 24px; }
       .vcn-help { flex-basis: 100%; font-size: 11px; color: var(--dsw-alias-label-secondary); }
       .vcn-error { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; font-size: 12px; color: var(--dsw-alias-state-error-primary); border: 1px solid var(--dsw-alias-state-error-primary); }
-      .vcn-foot { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding: 14px 0 18px; position: sticky; bottom: 0; background: var(--dsw-alias-bg-overlay); }
+      .vcn-notice { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; font-size: 12px; color: var(--dsw-alias-state-success-primary); border: 1px solid var(--dsw-alias-state-success-primary); }
+      .vcn-foot { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding: 14px 0 18px; position: sticky; bottom: 0; background: var(--dsw-alias-bg-base); }
       .vcn-btn { height: 32px; padding: 0 13px; border-radius: 9px; font: inherit; font-size: 13px; cursor: pointer; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); }
       .vcn-btn:hover { border-color: var(--dsw-alias-brand-primary); }
       .vcn-btn.primary { border-color: var(--dsw-alias-brand-primary); background: var(--dsw-alias-brand-primary); color: #fff; }
@@ -202,22 +178,18 @@ window.__ModuleLoader__.load({
       return `${(bytes / 1024 / 1024).toFixed(1)} MB`
     }
 
-    function formatDate(ms) {
-      if (!ms) return ''
-      const d = new Date(ms)
-      return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    }
-
-    function Entry(props) {
+    function WorkbenchPage(props) {
       const t = props.t
-      const actions = props.inputActions
-      const sessionId = props.sessionId
       const loadHistory = props.loadHistory
-      const [open, setOpen] = useState(false)
+      const startSession = props.startSession
+      const workspaces = props.useWorkspaces((state) => state.items)
+      const [workspacePath, setWorkspacePath] = useState('')
       const [history, setHistory] = useState([])
       const [loading, setLoading] = useState(false)
       const [historyError, setHistoryError] = useState('')
       const [selected, setSelected] = useState(null)
+      const [notice, setNotice] = useState('')
+      const [error, setError] = useState('')
 
       const [source, setSource] = useState('')
       const [orientation, setOrientation] = useState('portrait')
@@ -234,25 +206,26 @@ window.__ModuleLoader__.load({
       const [voiceRefText, setVoiceRefText] = useState('')
       const [style, setStyle] = useState('cinematic')
       const [customStyle, setCustomStyle] = useState('')
-      const [error, setError] = useState('')
+      const [starting, setStarting] = useState(false)
 
-      const dialogRef = useRef(null)
-      const phase = props.useInput((state) => state.phase)
-      const busy = phase !== 'plain'
-
-      useEffect(() => {
-        const dialog = dialogRef.current
-        if (!dialog) return
-        if (open && !dialog.open) dialog.showModal()
-        if (!open && dialog.open) dialog.close()
-      }, [open])
+      const workspaceList = Array.isArray(workspaces) ? workspaces : []
+      const workspace = workspaceList.find((item) => item.path === workspacePath)
+      const commandSessionId = workspace && Array.isArray(workspace.sessionIds) ? workspace.sessionIds[0] : ''
 
       useEffect(() => {
-        if (!open || !loadHistory) return
+        const items = Array.isArray(workspaces) ? workspaces : []
+        if (items.length === 0) return
+        if (!workspacePath || !items.some((item) => item.path === workspacePath)) {
+          setWorkspacePath(items[0].path)
+        }
+      }, [workspaces, workspacePath])
+
+      useEffect(() => {
+        if (!workspacePath) return
         let cancelled = false
         setLoading(true)
         setHistoryError('')
-        loadHistory(sessionId)
+        loadHistory(workspacePath, commandSessionId)
           .then((data) => {
             if (cancelled) return
             setHistory(Array.isArray(data && data.projects) ? data.projects : [])
@@ -265,7 +238,17 @@ window.__ModuleLoader__.load({
             if (!cancelled) setLoading(false)
           })
         return () => { cancelled = true }
-      }, [open, sessionId, loadHistory])
+      }, [workspacePath, commandSessionId, loadHistory])
+
+      function refresh() {
+        if (!workspacePath) return
+        setLoading(true)
+        setHistoryError('')
+        loadHistory(workspacePath, commandSessionId)
+          .then((data) => setHistory(Array.isArray(data && data.projects) ? data.projects : []))
+          .catch((err) => setHistoryError(err && err.message ? err.message : String(err)))
+          .finally(() => setLoading(false))
+      }
 
       function reset() {
         setSource('')
@@ -284,11 +267,11 @@ window.__ModuleLoader__.load({
         setStyle('cinematic')
         setCustomStyle('')
         setError('')
+        setNotice('')
       }
 
       function applyProject(project) {
         if (!project) return
-        setSelected(project)
         const pw = Number(project.width || 0)
         const ph = Number(project.height || 0)
         if (project.orientation === 'landscape' && pw === 1920 && ph === 1080) {
@@ -320,6 +303,8 @@ window.__ModuleLoader__.load({
         }
         setVoice(project.voice === 'male' ? 'male' : 'female')
         setStyle(project.style || 'cinematic')
+        setError('')
+        setNotice('')
       }
 
       function buildMessage() {
@@ -368,141 +353,134 @@ window.__ModuleLoader__.load({
         return lines.join('\n')
       }
 
-      function commit(send) {
-        if (busy) { setError(t('busy')); return }
+      function submit() {
+        if (starting) return
         try {
-          actions.setDraft(buildMessage())
-          if (send) actions.submit()
+          const message = buildMessage()
+          startSession(workspace ? workspace.workspaceId : undefined, message)
           setError('')
-          setOpen(false)
+          setNotice(t('started'))
+          setStarting(true)
         } catch (err) {
           setError(err && err.message ? err.message : String(err))
         }
       }
 
-      return h(React.Fragment, null,
-        h('button', {
-          className: 'vcn-trigger', type: 'button', title: t('open'),
-          onClick: () => { setError(''); setOpen(true) },
-        },
-          h('svg', { viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
-            h('rect', { x: 3, y: 5, width: 18, height: 14, rx: 3, stroke: 'currentColor', strokeWidth: 1.7 }),
-            h('path', { d: 'M10 9.5v5l4.2-2.5z', fill: 'currentColor' })),
-          h('span', null, t('open'))),
-        h('dialog', {
-          ref: dialogRef, className: 'vcn-dialog',
-          onClose: () => setOpen(false),
-          onClick: (event) => { if (event.target === dialogRef.current) setOpen(false) },
-        },
-          h('div', { className: 'vcn-shell' },
-            h('div', { className: 'vcn-head' },
-              h('div', { className: 'vcn-head-main' },
-                h('h2', { className: 'vcn-title' }, t('title')),
-                h('p', { className: 'vcn-sub' }, t('subtitle'))),
-              h('button', { className: 'vcn-iconbtn', type: 'button', title: t('close'), onClick: () => setOpen(false) }, '×')),
-            h('div', { className: 'vcn-main' },
-              h('aside', { className: 'vcn-aside' },
-                h('div', { className: 'vcn-aside-head' },
-                  h('span', { className: 'vcn-aside-title' }, t('history')),
-                  h('button', {
-                    className: 'vcn-btn small ghost', type: 'button', disabled: loading,
-                    onClick: () => {
-                      setLoading(true); setHistoryError('')
-                      loadHistory(sessionId)
-                        .then((data) => setHistory(Array.isArray(data && data.projects) ? data.projects : []))
-                        .catch((err) => setHistoryError(err && err.message ? err.message : String(err)))
-                        .finally(() => setLoading(false))
-                    },
-                  }, t('refresh'))),
-                h('div', { className: 'vcn-list' },
-                  loading ? h('div', { className: 'vcn-empty' }, t('loading')) : null,
-                  historyError ? h('div', { className: 'vcn-empty' }, `${t('loadFailed')}: ${historyError}`) : null,
-                  !loading && !historyError && history.length === 0 ? h('div', { className: 'vcn-empty' }, t('empty')) : null,
-                  history.map((project) => h('button', {
-                    key: project.path, type: 'button',
-                    className: `vcn-item${selected && selected.path === project.path ? ' selected' : ''}`,
-                    onClick: () => setSelected(project),
-                  },
-                    h('span', { className: 'vcn-item-title' }, project.title),
-                    h('span', { className: 'vcn-item-meta' },
-                      h('span', { className: `vcn-badge${project.done ? ' done' : ''}` }, project.done ? t('done') : t('unfinished')),
-                      h('span', null, project.orientation === 'landscape' ? '16:9' : '9:16'),
-                      h('span', null, project.duration),
-                      h('span', null, `${project.imageCount} ${t('images')}`))))),
-              h('section', { className: 'vcn-content' },
-                selected ? h('div', { className: 'vcn-selected' },
-                  h('div', { className: 'vcn-selected-row' },
-                    h('span', { className: 'vcn-selected-title' }, selected.title),
-                    h('button', { className: 'vcn-btn small', type: 'button', onClick: () => applyProject(selected) }, t('reuse'))),
-                  h('div', { className: 'vcn-selected-meta' },
-                    h('span', null, `${t('selected')} · ${selected.orientation === 'landscape' ? '16:9' : '9:16'} · ${selected.duration}`),
-                    h('span', null, selected.finalName ? `${formatBytes(selected.finalSize)} · ${selected.finalName}` : t('noFinal')))) : null,
-                error ? h('p', { className: 'vcn-error' }, error) : null,
-                h('div', { className: 'vcn-body' },
-                  field(t('source'), h('textarea', {
-                    className: 'vcn-textarea', value: source, placeholder: t('sourceHint'),
-                    onChange: (event) => setSource(event.target.value),
-                  })),
-                  field(t('orientation'), h('select', {
-                    className: 'vcn-select', value: orientation,
-                    onChange: (event) => setOrientation(event.target.value),
-                  },
-                    h('option', { value: 'portrait' }, t('portrait')),
-                    h('option', { value: 'landscape' }, t('landscape')),
-                    h('option', { value: 'custom' }, t('custom')))),
-                  orientation === 'custom' ? field('', h(React.Fragment, null,
-                    h('input', { className: 'vcn-input', type: 'number', min: 1, value: width, 'aria-label': t('width'), onChange: (event) => setWidth(event.target.value) }),
-                    h('span', { className: 'vcn-help' }, '×'),
-                    h('input', { className: 'vcn-input', type: 'number', min: 1, value: height, 'aria-label': t('height'), onChange: (event) => setHeight(event.target.value) }),
-                  )) : null,
-                  field(t('duration'), h(React.Fragment, null,
-                    h('select', { className: 'vcn-select', value: durationMode, onChange: (event) => setDurationMode(event.target.value) },
-                      h('option', { value: 'fixed' }, t('fixed')),
-                      h('option', { value: 'range' }, t('range')),
-                      h('option', { value: 'unlimited' }, t('unlimited'))),
-                    durationMode === 'fixed' ? h(React.Fragment, null,
-                      h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: minutes, onChange: (event) => setMinutes(event.target.value) }),
-                      h('span', { className: 'vcn-help' }, t('minutes'))) : null,
-                    durationMode === 'range' ? h(React.Fragment, null,
-                      h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: minMinutes, onChange: (event) => setMinMinutes(event.target.value) }),
-                      h('span', { className: 'vcn-help' }, t('to')),
-                      h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: maxMinutes, onChange: (event) => setMaxMinutes(event.target.value) }),
-                      h('span', { className: 'vcn-help' }, t('minutes'))) : null)),
-                  field(t('segment'), h(React.Fragment, null,
-                    h('input', { className: 'vcn-input', type: 'number', min: 1, value: segmentMin, onChange: (event) => setSegmentMin(event.target.value) }),
-                    h('span', { className: 'vcn-help' }, t('to')),
-                    h('input', { className: 'vcn-input', type: 'number', min: 1, value: segmentMax, onChange: (event) => setSegmentMax(event.target.value) }),
-                    h('span', { className: 'vcn-help' }, t('seconds')))),
-                  field(t('voice'), h(React.Fragment, null,
-                    h('select', { className: 'vcn-select', value: voice, onChange: (event) => setVoice(event.target.value) },
-                      h('option', { value: 'female' }, t('female')),
-                      h('option', { value: 'male' }, t('male')),
-                      h('option', { value: 'custom' }, t('customVoice'))),
-                    voice === 'custom' ? h(React.Fragment, null,
-                      h('input', { className: 'vcn-input vcn-wide', value: voiceRef, placeholder: t('voiceRefHint'), onChange: (event) => setVoiceRef(event.target.value) }),
-                      h('input', { className: 'vcn-input vcn-wide', value: voiceRefText, placeholder: t('voiceRefText'), onChange: (event) => setVoiceRefText(event.target.value) })) : null)),
-                  field(t('style'), h(React.Fragment, null,
-                    h('select', { className: 'vcn-select', value: style, onChange: (event) => setStyle(event.target.value) },
-                      h('option', { value: 'cinematic' }, t('cinematic')),
-                      h('option', { value: 'documentary' }, t('documentary')),
-                      h('option', { value: 'anime' }, t('anime')),
-                      h('option', { value: 'custom' }, t('customStyle'))),
-                    style === 'custom' ? h('input', { className: 'vcn-input vcn-wide', value: customStyle, onChange: (event) => setCustomStyle(event.target.value) }) : null))),
-                h('div', { className: 'vcn-foot' },
-                  h('button', { className: 'vcn-btn ghost vcn-reset', type: 'button', onClick: reset }, t('defaults')),
-                  h('button', { className: 'vcn-btn', type: 'button', onClick: () => setOpen(false) }, t('cancel')),
-                  h('button', { className: 'vcn-btn', type: 'button', disabled: busy, onClick: () => commit(false) }, t('fill')),
-                  h('button', { className: 'vcn-btn primary', type: 'button', disabled: busy, onClick: () => commit(true) }, t('send')))))))),
+      return h('div', { className: 'vcn-page' },
+        h('div', { className: 'vcn-head' },
+          h('div', { className: 'vcn-head-main' },
+            h('h1', { className: 'vcn-title' }, t('title')),
+            h('p', { className: 'vcn-sub' }, t('subtitle'))),
+          h('label', { className: 'vcn-workspace' },
+            h('span', null, t('workspace')),
+            h('select', {
+              className: 'vcn-select', value: workspacePath,
+              onChange: (event) => { setWorkspacePath(event.target.value); setSelected(null) },
+            },
+              (Array.isArray(workspaces) ? workspaces : []).map((item) =>
+                h('option', { value: item.path, key: item.workspaceId }, item.title || item.path))))),
+        h('div', { className: 'vcn-main' },
+          h('aside', { className: 'vcn-aside' },
+            h('div', { className: 'vcn-aside-head' },
+              h('span', { className: 'vcn-aside-title' }, t('history')),
+              h('button', { className: 'vcn-btn small ghost', type: 'button', disabled: loading, onClick: refresh }, t('refresh'))),
+            h('div', { className: 'vcn-list' },
+              loading ? h('div', { className: 'vcn-empty' }, t('loading')) : null,
+              historyError ? h('div', { className: 'vcn-empty' }, `${t('loadFailed')}: ${historyError}`) : null,
+              !loading && !historyError && history.length === 0 ? h('div', { className: 'vcn-empty' }, t('empty')) : null,
+              history.map((project) => h('button', {
+                key: project.path, type: 'button',
+                className: `vcn-item${selected && selected.path === project.path ? ' selected' : ''}`,
+                onClick: () => setSelected(project),
+              },
+                h('span', { className: 'vcn-item-title' }, project.title),
+                h('span', { className: 'vcn-item-meta' },
+                  h('span', { className: `vcn-badge${project.done ? ' done' : ''}` }, project.done ? t('done') : t('unfinished')),
+                  h('span', null, project.orientation === 'landscape' ? '16:9' : '9:16'),
+                  h('span', null, project.duration),
+                  h('span', null, `${project.imageCount} ${t('images')}`)))))),
+          h('section', { className: 'vcn-content' },
+            selected ? h('div', { className: 'vcn-selected' },
+              h('div', { className: 'vcn-selected-row' },
+                h('span', { className: 'vcn-selected-title' }, selected.title),
+                h('button', { className: 'vcn-btn small', type: 'button', onClick: () => applyProject(selected) }, t('reuse'))),
+              h('div', { className: 'vcn-selected-meta' },
+                h('span', null, `${t('selected')} · ${selected.orientation === 'landscape' ? '16:9' : '9:16'} · ${selected.duration}`),
+                h('span', null, selected.finalName ? `${formatBytes(selected.finalSize)} · ${selected.finalName}` : t('noFinal')))) : null,
+            notice ? h('p', { className: 'vcn-notice' }, notice) : null,
+            error ? h('p', { className: 'vcn-error' }, error) : null,
+            h('div', { className: 'vcn-body' },
+              field(t('source'), h('textarea', {
+                className: 'vcn-textarea', value: source, placeholder: t('sourceHint'),
+                onChange: (event) => setSource(event.target.value),
+              })),
+              field(t('orientation'), h('select', {
+                className: 'vcn-select', value: orientation,
+                onChange: (event) => setOrientation(event.target.value),
+              },
+                h('option', { value: 'portrait' }, t('portrait')),
+                h('option', { value: 'landscape' }, t('landscape')),
+                h('option', { value: 'custom' }, t('custom')))),
+              orientation === 'custom' ? field('', h(React.Fragment, null,
+                h('input', { className: 'vcn-input', type: 'number', min: 1, value: width, 'aria-label': t('width'), onChange: (event) => setWidth(event.target.value) }),
+                h('span', { className: 'vcn-help' }, '×'),
+                h('input', { className: 'vcn-input', type: 'number', min: 1, value: height, 'aria-label': t('height'), onChange: (event) => setHeight(event.target.value) }),
+              )) : null,
+              field(t('duration'), h(React.Fragment, null,
+                h('select', { className: 'vcn-select', value: durationMode, onChange: (event) => setDurationMode(event.target.value) },
+                  h('option', { value: 'fixed' }, t('fixed')),
+                  h('option', { value: 'range' }, t('range')),
+                  h('option', { value: 'unlimited' }, t('unlimited'))),
+                durationMode === 'fixed' ? h(React.Fragment, null,
+                  h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: minutes, onChange: (event) => setMinutes(event.target.value) }),
+                  h('span', { className: 'vcn-help' }, t('minutes'))) : null,
+                durationMode === 'range' ? h(React.Fragment, null,
+                  h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: minMinutes, onChange: (event) => setMinMinutes(event.target.value) }),
+                  h('span', { className: 'vcn-help' }, t('to')),
+                  h('input', { className: 'vcn-input', type: 'number', min: 0.1, step: 0.5, value: maxMinutes, onChange: (event) => setMaxMinutes(event.target.value) }),
+                  h('span', { className: 'vcn-help' }, t('minutes'))) : null)),
+              field(t('segment'), h(React.Fragment, null,
+                h('input', { className: 'vcn-input', type: 'number', min: 1, value: segmentMin, onChange: (event) => setSegmentMin(event.target.value) }),
+                h('span', { className: 'vcn-help' }, t('to')),
+                h('input', { className: 'vcn-input', type: 'number', min: 1, value: segmentMax, onChange: (event) => setSegmentMax(event.target.value) }),
+                h('span', { className: 'vcn-help' }, t('seconds')))),
+              field(t('voice'), h(React.Fragment, null,
+                h('select', { className: 'vcn-select', value: voice, onChange: (event) => setVoice(event.target.value) },
+                  h('option', { value: 'female' }, t('female')),
+                  h('option', { value: 'male' }, t('male')),
+                  h('option', { value: 'custom' }, t('customVoice'))),
+                voice === 'custom' ? h(React.Fragment, null,
+                  h('input', { className: 'vcn-input vcn-wide', value: voiceRef, placeholder: t('voiceRefHint'), onChange: (event) => setVoiceRef(event.target.value) }),
+                  h('input', { className: 'vcn-input vcn-wide', value: voiceRefText, placeholder: t('voiceRefText'), onChange: (event) => setVoiceRefText(event.target.value) })) : null)),
+              field(t('style'), h(React.Fragment, null,
+                h('select', { className: 'vcn-select', value: style, onChange: (event) => setStyle(event.target.value) },
+                  h('option', { value: 'cinematic' }, t('cinematic')),
+                  h('option', { value: 'documentary' }, t('documentary')),
+                  h('option', { value: 'anime' }, t('anime')),
+                  h('option', { value: 'custom' }, t('customStyle'))),
+                style === 'custom' ? h('input', { className: 'vcn-input vcn-wide', value: customStyle, onChange: (event) => setCustomStyle(event.target.value) }) : null))),
+            h('div', { className: 'vcn-foot' },
+              h('button', { className: 'vcn-btn ghost vcn-reset', type: 'button', onClick: reset }, t('defaults')),
+              h('button', { className: 'vcn-btn primary', type: 'button', disabled: starting, onClick: submit }, t('start'))))),
         h('style', null, css))
     }
 
+    function VideoIcon(props) {
+      const size = props && props.size ? props.size : 18
+      return h('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        h('rect', { x: 3, y: 5, width: 18, height: 14, rx: 3, stroke: 'currentColor', strokeWidth: 1.7 }),
+        h('path', { d: 'M10 9.5v5l4.2-2.5z', fill: 'currentColor' }))
+    }
+
     return {
-      inject: ['slots', 'locale', 'remote', 'remote.commands'],
+      inject: ['slots', 'locale', 'remote', 'remote.commands', 'uiWorkspace'],
       apply(ctx) {
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'video-narrator: locale')
         const t = ctx.locale.bind(NS)
-        async function loadHistory(sessionId) {
-          const result = await ctx.remote.commands.execute(sessionId, '/vcn-history', [])
+        async function loadHistory(path, sessionId) {
+          if (!sessionId) return { projects: [] }
+          const line = path ? `/vcn-history ${path}` : '/vcn-history'
+          const result = await ctx.remote.commands.execute(sessionId, line, [])
           if (!result || result.ok !== true) {
             const message = result && result.error && result.error.message ? result.error.message : 'vcn-history failed'
             throw new Error(message)
@@ -514,12 +492,17 @@ window.__ModuleLoader__.load({
           }
           return JSON.parse(outcome.text)
         }
-        ctx.effect(() => ctx.slots.inject('conversation.composer.dock', () =>
-          ctx.slots.register({
-            name: 'conversation.composer.dock',
-            id: 'video-narrator-control',
-            order: 30,
-          }, (props) => h(Entry, { ...props, t, loadHistory }))), 'video-narrator: composer control')
+        function startSession(workspaceId, prompt) {
+          ctx.uiWorkspace.startSession(workspaceId, { prompt, whenDraftExists: 'append' })
+        }
+        ctx.effect(() => ctx.slots.inject('main', () => ctx.slots.register({
+          name: 'main', key: 'video-narrator', locale: NS,
+          inject: () => ({ t, loadHistory, startSession }),
+        }, WorkbenchPage)), 'video-narrator: main page')
+        ctx.effect(() => ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+          name: 'sidebar.panellist', id: 'video-narrator', order: 20, locale: NS,
+          label: () => t('nav'),
+        }, VideoIcon)), 'video-narrator: sidebar entry')
       },
     }
   },

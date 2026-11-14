@@ -104,8 +104,9 @@ export function apply(ctx) {
   ctx.effect(() => ctx.commands.register({
     name: 'vcn-history',
     description: 'List Video Narrator projects in the current workspace',
-    handler: async ({ agent }) => {
-      const cwd = await ctx.workingDirectory.ensure(agent)
+    handler: async (invocation) => {
+      const requested = String(invocation.rawInput || '').trim()
+      const cwd = requested || await ctx.workingDirectory.ensure(invocation.agent)
       return { kind: 'success', text: JSON.stringify({ cwd, projects: collectProjects(cwd) }) }
     }
   }))
