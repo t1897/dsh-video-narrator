@@ -11,7 +11,7 @@ A DSH skill that turns a video, video URL, article URL, PDF, or plain text into 
 `vcs auto` runs the whole pipeline in one local process; the agent only starts it and handles failures.
 
 1. Ingests local video/audio, YouTube/Bilibili URLs, article URLs, PDFs, or text.
-2. Transcribes video with Qwen3-ASR (MLX).
+2. Transcribes video in 240s chunks with 30s overlap using Qwen3-ASR (MLX), then merges overlaps with a Python algorithm.
 3. Cleans the source into Markdown, then writes a timed narration script.
 4. Generates a title, description, and exactly 10 tags for `04_metadata.json`.
 5. Writes orientation-aware image prompts and generates one image per scene through ModelScope.

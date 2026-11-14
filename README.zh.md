@@ -9,7 +9,7 @@
 `vcs auto` 在一个本地进程里跑完整条流水线；Agent 只负责发起命令和处理失败。
 
 1. 接收本地视频/音频、YouTube/Bilibili 链接、文章链接、PDF 或文本。
-2. 视频用 Qwen3-ASR（MLX）转写。
+2. 视频按 240 秒/30 秒重叠切块，用 Qwen3-ASR（MLX）转写，再用 Python 算法合并重叠文本。
 3. 把素材整理成 Markdown 文稿，再写成带时长控制的口播稿。
 4. 生成有吸引力的标题、简介和恰好 10 个 tags，写入 `04_metadata.json`。
 5. 按横屏/竖屏生成构图不同的配图 Prompt，并通过魔搭 ModelScope 逐段生图。

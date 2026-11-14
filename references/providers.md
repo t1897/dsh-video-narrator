@@ -38,7 +38,9 @@
 
 默认：`mlx-community/Qwen3-ASR-1.7B-8bit`（备选 0.6B）。
 
-- 整段转写：直接把 `source.wav` 交给 Qwen3-ASR；模型内部按 20 分钟上限处理长音频，不再由 CLI 切成 30 秒块。
+- ASR 切块与合并（对齐 `new_video` 参考项目）：`240 秒/段`、`30 秒重叠`、步长 `210 秒`；每块单独转写，再用 `deduplicate_text_segments` 的 Python 算法合并。
+  - 先找精确最长后缀/前缀重叠（4–600 字符）；找不到则用 `difflib.SequenceMatcher` 模糊重叠（min 30 字符、相似度 0.82、左侧尾差 3 字符）。
+  - 合并只在 Python 里做，不调用大模型；段间按中英文标点/空格规则拼接。
 - 语言 `en`/`zh` 等；热词 `--hotwords` 可选。
 - 输出 `transcript.raw.txt`。
 - 兜底：`faster-whisper large-v3-turbo`（CPU，MIT）。

@@ -14,6 +14,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -825,22 +826,166 @@ def _guess_title(html: str) -> str:
     return re.sub(r"\s+", " ", match.group(1)).strip()
 
 
+TEXT_JOIN_PREFIX_CHARS = set("([{<\"'")
+TEXT_JOIN_PUNCTUATION = set("，。！？；：、,.!?;:)]}>\"'")
+TEXT_JOIN_PUNCTUATION_TEXT = "".join(TEXT_JOIN_PUNCTUATION)
+TEXT_JOIN_CJK_PUNCTUATION = set("，。！？；：、")
+
+
+def _is_cjk_char(char: str) -> bool:
+    return "\u3400" <= char <= "\u9fff" or "\uf900" <= char <= "\ufaff"
+
+
+def _longest_overlap(left: str, right: str, min_chars: int = 4, max_chars: int = 600) -> int:
+    left = left or ""
+    right = right or ""
+    max_len = min(len(left), len(right), max_chars)
+    for length in range(max_len, min_chars - 1, -1):
+        if left[-length:] == right[:length]:
+            return length
+    return 0
+
+
+def _fuzzy_longest_overlap(
+    left: str,
+    right: str,
+    min_chars: int = 30,
+    max_chars: int = 600,
+    min_ratio: float = 0.82,
+    left_tail_tolerance: int = 3,
+) -> int:
+    left_window = (left or "")[-max_chars:]
+    right_window = (right or "")[:max_chars]
+    if not left_window or not right_window:
+        return 0
+    blocks = [
+        block
+        for block in difflib.SequenceMatcher(None, left_window, right_window, autojunk=False).get_matching_blocks()
+        if block.size
+    ]
+    if not blocks:
+        return 0
+    first = blocks[0]
+    if first.b != 0:
+        return 0
+    candidate = None
+    for block in blocks:
+        tail = left_window[block.a + block.size :]
+        if len(tail) <= left_tail_tolerance and tail.strip(TEXT_JOIN_PUNCTUATION_TEXT).strip() == "":
+            candidate = block
+    if candidate is None:
+        return 0
+    left_start = first.a
+    left_end = candidate.a + candidate.size
+    right_end = candidate.b + candidate.size
+    if right_end < min_chars:
+        return 0
+    matched = sum(
+        block.size
+        for block in blocks
+        if block.a >= left_start and block.a + block.size <= left_end and block.b + block.size <= right_end
+    )
+    if matched < min_chars:
+        return 0
+    left_span = left_end - left_start
+    similarity = (2 * matched) / (left_span + right_end)
+    if similarity < min_ratio:
+        return 0
+    return right_end
+
+
+def _join_text_boundary(left: str, right: str) -> str:
+    if not left or not right:
+        return right
+    if left[-1].isspace() or right[0].isspace():
+        return right
+    if _is_cjk_char(left[-1]) and _is_cjk_char(right[0]):
+        return right
+    if left[-1] in TEXT_JOIN_CJK_PUNCTUATION:
+        return right
+    if right[0] in TEXT_JOIN_PUNCTUATION or right[0] in TEXT_JOIN_PREFIX_CHARS:
+        return right
+    return " " + right
+
+
+def deduplicate_text_segments(texts: list[str]) -> list[str]:
+    """Merge overlapping ASR chunks, matching new_video's Python algorithm."""
+    if not texts:
+        return []
+    cleaned = [texts[0].strip()]
+    for text in texts[1:]:
+        current = text.strip()
+        previous = "".join(cleaned)
+        overlap = _longest_overlap(previous, current) or _fuzzy_longest_overlap(previous, current)
+        append_text = current[overlap:] if overlap else current
+        cleaned.append(_join_text_boundary(previous, append_text))
+    return cleaned
+
+
 def transcribe_project(project: Project, *, language: str = "English", model: str | None = None) -> None:
     wav = project.p("source", "source.wav")
     if not wav.exists():
         raise VcsError(f"missing source audio: {wav}")
     model_id = model or project.config.get("models", {}).get("asr") or DEFAULTS["asr_model"]
+    segment_seconds = int(project.config.get("asr_segment_seconds") or 240)
+    overlap_seconds = int(project.config.get("asr_overlap_seconds") or 30)
+    step = max(1, segment_seconds - overlap_seconds)
+    duration = ffprobe_duration(wav)
+    chunk_dir = project.p("source", "chunks")
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    for old in chunk_dir.glob("chunk_*.wav"):
+        old.unlink()
+    chunks: list[dict[str, Any]] = []
+    offset = 0.0
+    index = 0
+    while offset < duration:
+        chunk_duration = min(segment_seconds, duration - offset)
+        chunk_path = chunk_dir / f"chunk_{index:04d}.wav"
+        run([
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-ss", f"{offset:.3f}", "-t", f"{chunk_duration:.3f}",
+            "-i", str(wav), "-ar", "16000", "-ac", "1",
+            "-c:a", "pcm_s16le", str(chunk_path),
+        ])
+        chunks.append({"index": index, "path": chunk_path, "offset": offset, "duration": chunk_duration})
+        offset += step
+        index += 1
+    if not chunks:
+        raise VcsError("ASR chunking produced no chunks")
+
     os.environ.setdefault("HF_HOME", str(default_hf_home()))
     from mlx_audio.stt import load as load_stt
 
     eprint(f"asr: loading {model_id}")
     stt = load_stt(model_id)
-    eprint("asr: transcribing full audio")
-    result = stt.generate(str(wav), language=language)
-    raw = getattr(result, "text", str(result)).strip()
+    partial_dir = chunk_dir / "asr_partial"
+    partial_dir.mkdir(exist_ok=True)
+    texts: list[str] = []
+    for chunk in chunks:
+        checkpoint = partial_dir / f"chunk_{int(chunk['index']):04d}.json"
+        cached = load_json(checkpoint, {})
+        text = str(cached.get("text") or "").strip() if isinstance(cached, dict) else ""
+        if not text:
+            eprint(f"asr: chunk {int(chunk['index']) + 1}/{len(chunks)}")
+            result = stt.generate(str(chunk["path"]), language=language)
+            text = getattr(result, "text", str(result)).strip()
+            write_json(checkpoint, {"index": int(chunk["index"]), "text": text})
+        texts.append(text)
+    deduped = deduplicate_text_segments(texts)
+    raw = "".join(deduped).strip()
     project.p("01_transcript.raw.txt").write_text(raw + "\n", encoding="utf-8")
-    project.mark("asr", [project.p("01_transcript.raw.txt")], model=model_id, language=language, chunks=1)
-    eprint(f"asr: {len(raw)} chars")
+    segments = []
+    for chunk, raw_text, clean_text in zip(chunks, texts, deduped, strict=True):
+        segments.append({
+            "index": int(chunk["index"]),
+            "offset": chunk["offset"],
+            "duration": chunk["duration"],
+            "raw_text": raw_text,
+            "dedup_text": clean_text,
+        })
+    write_json(project.p("01_transcript.segments.json"), segments)
+    project.mark("asr", [project.p("01_transcript.raw.txt"), project.p("01_transcript.segments.json")], model=model_id, language=language, chunks=len(chunks))
+    eprint(f"asr: {len(raw)} chars from {len(chunks)} chunks")
 
 
 def cmd_ingest(args: argparse.Namespace) -> int:
@@ -1571,6 +1716,9 @@ def cleanup_intermediates(project: Project) -> None:
         path = project.p(folder)
         if path.exists():
             shutil.rmtree(path, ignore_errors=True)
+    chunks = project.p("source", "chunks")
+    if chunks.exists():
+        shutil.rmtree(chunks, ignore_errors=True)
     for path in (project.p(".merged.mp4"), project.p("clips.txt")):
         path.unlink(missing_ok=True)
     final_dir = project.p("final")

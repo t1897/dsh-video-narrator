@@ -50,7 +50,7 @@ python3 scripts/vcs.py auto \
 `vcs auto` 在同一个进程里依次完成：
 
 1. `ingest`：下载/抽取素材；
-2. `asr`：整段音频交给 Qwen3-ASR，**不按 30 秒切块**，只返回一份 `01_transcript.raw.txt`；
+2. `asr`：按参考项目 `240 秒/段、30 秒重叠、步长 210 秒` 切块，Qwen3-ASR 转写后由 **Python `deduplicate_text_segments`** 合并成一份 `01_transcript.raw.txt`；
 3. `text cleanup`：把整份 raw transcript 一次性交给 `providers.json` 里指定的文本模型；
 4. `text script`：把整理后的 Markdown 一次性交给同一个文本模型，产出 `03_script.json`；
 5. `text metadata`：一次调用产出标题/简介/10 tags；
@@ -74,7 +74,7 @@ python3 scripts/vcs.py auto \
 **v1.0 已完成**（2026-11-12）：6 项单测通过，4 条真实成片（YouTube ×2 / 文章 / PDF），支持生成前配置、多 API 回退、来源目录命名与中间文件清理。
 
 - **M0**：`doctor`、`init`、`run --mock`、`status`；mock 文本/图片/TTS + 真实 ffmpeg 合成。
-- **M1**：`ingest`（本地视频/YouTube/文章/PDF/文本）+ `asr`（Qwen3-ASR-1.7B，MLX，整段转写）。
+- **M1**：`ingest`（本地视频/YouTube/文章/PDF/文本）+ `asr`（Qwen3-ASR-1.7B，MLX；240 秒块 + 30 秒重叠，Python 合并）。
 - **M2**：`vcs auto` 默认通过 `vcs text` 调用自定义 API；cleanup/script/metadata/prompts 各一次调用；也保留人工写文件作为调试后备。`validate` 做结构、字数、时长、10 tags 校验。
 - **M3**：`images`（魔搭 ModelScope 异步 API）、`tts`（Qwen3-TTS-1.7B，MLX）、`compose`（ffmpeg 逐段 + concat + 按标题命名）。
 - 四个真实输入已跑通：YouTube ×2、Bloomberg 文章（Business Times 免费转载正文）、Foreign Affairs PDF。
@@ -201,7 +201,7 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 ## `vcs auto` 内部步骤（已实现）
 
 1. **ingest**：本地视频/视频链接 → 抽音频；文章链接 → trafilatura；PDF → pypdf；纯文本 → 直接。
-2. **asr**：Qwen3-ASR-1.7B（MLX）整段转写；输出 `01_transcript.raw.txt`。
+2. **asr**：Qwen3-ASR-1.7B（MLX）按 240 秒/30 秒重叠切块；Python `deduplicate_text_segments` 合并；输出 `01_transcript.raw.txt` + `01_transcript.segments.json`。
 3. **cleanup**：整份 raw transcript 一次调用 `references/prompts/01_cleanup.md`，写 `02_transcript.md`（默认由 `vcs text` 完成，Agent 不手写）。
 4. **script**：读 `02_script.md` + 目标时长/分段/语速，写 `03_script.json`（`segments[]`，无 `parts`）。
 5. **metadata**：读 `03_metadata.md`，写 `04_metadata.json`（title + description + 恰好 10 个 tags）。
