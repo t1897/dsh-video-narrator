@@ -46,6 +46,10 @@ python3 scripts/vcs.py providers --file providers.json
 
 `providers.json` is gitignored. Keys are read from environment variables named by `api_key_env`. The `text` array is tried in order by `vcs text`; the `image` array is tried in order per scene. ModelScope domestic (`api-inference.modelscope.cn`) and international (`api-inference.modelscope.ai`) endpoints can be mixed.
 
+## Control UI
+
+After installation, a **Video settings** button appears below the composer. It opens a form for the source, orientation (portrait/landscape/custom), duration (fixed/range/unlimited), segment length, voice, and style. **Fill composer** writes a structured request into the input; **Fill and start** sends it. The request carries `[VCS_PARAMS_CONFIRMED]`, so the skill starts without asking the same parameters again.
+
 ## Use
 
 Ask the agent for a video from a URL, PDF, article, or text. Before doing anything, the skill opens the parameter confirmation dialog and asks for orientation, duration (fixed, range, or unlimited), segment length, voice, and style.

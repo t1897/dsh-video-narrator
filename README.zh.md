@@ -42,6 +42,10 @@ python3 scripts/vcs.py providers --file providers.json
 
 `providers.json` 已被 gitignore。Key 通过 `api_key_env` 指向 `.env` 里的环境变量。`text` 数组由 `vcs text` 按顺序回退；`image` 数组按场景顺序回退。魔搭国内站（`api-inference.modelscope.cn`）和国际站（`api-inference.modelscope.ai`）可以混排。
 
+## 控制 UI
+
+安装后，输入框下方会出现 **视频参数** 按钮。点开可以设置素材、画幅（竖屏/横屏/自定义）、时长（固定/范围/不限）、每段秒数、音色和风格。**填入输入框** 会把结构化请求写进输入框；**填入并开始** 会直接发送。消息带有 `[VCS_PARAMS_CONFIRMED]`，Skill 不会再次询问同一批参数。
+
 ## 使用
 
 直接对 Agent 说要做一条口播视频即可。Skill 会**先弹出参数确认对话框**，确认画幅、时长（固定/范围/不限）、每段秒数、音色和风格后才开始生成。
