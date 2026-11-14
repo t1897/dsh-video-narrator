@@ -24,10 +24,10 @@ description: 把视频、视频链接、文章链接、PDF 或纯文本转成带
 
 - **不要跳过对话框直接开跑。** 即使用户在请求里已经写了“竖屏、5 分钟”，也要用一题汇总确认（“确认开始 / 修改参数”），不要静默采用。
 - 用户跳过某一项时用默认值，但在开始前明确复述最终参数。
-- 如果安装了 Client UI，输入框下方的「视频参数」控件会生成带 `[VCS_PARAMS_CONFIRMED]` 的消息；收到这种消息时不要再弹对话框，复述参数后直接开始。
+- 如果安装了 Client UI，输入框下方的「视频工作台」控件会生成带 `[VCS_PARAMS_CONFIRMED]` 的消息；收到这种消息时不要再弹对话框，复述参数后直接开始。
 - 把答案传给 `vcs init` / `vcs ingest` / `vcs config`：`--orientation`、`--duration`、`--segment-range`、`--voice`、`--style`；自定义参考音用 `--voice-ref`（并尽量带 `--voice-ref-text`）。
 - 没有 `ask_user_question` 工具的环境（例如纯 CLI/headless），在对话中逐项询问，或让用户显式传齐参数；**不能默认静默开始**。
-- 如果用户消息包含 `[VCS_PARAMS_CONFIRMED]`（来自输入框下方的“视频参数”控件），说明参数已经通过 UI 确认：**不要再调用 `ask_user_question`**，复述一次参数后直接开始；只有素材缺失时才问素材。
+- 如果用户消息包含 `[VCS_PARAMS_CONFIRMED]`（来自输入框下方的“视频工作台”控件），说明参数已经通过 UI 确认：**不要再调用 `ask_user_question`**，复述一次参数后直接开始；只有素材缺失时才问素材。
 - 参数确认完成后才进入“完整流程”。
 
 ## 当前实现状态

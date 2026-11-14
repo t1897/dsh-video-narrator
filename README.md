@@ -48,7 +48,7 @@ python3 scripts/vcs.py providers --file providers.json
 
 ## Control UI
 
-After installation, a **Video settings** button appears below the composer. It opens a form for the source, orientation (portrait/landscape/custom), duration (fixed/range/unlimited), segment length, voice, and style. **Fill composer** writes a structured request into the input; **Fill and start** sends it. The request carries `[VCS_PARAMS_CONFIRMED]`, so the skill starts without asking the same parameters again.
+After installation, a **Video workbench** button appears below the composer. It opens a large two-column panel: the left side lists past projects from `runs/` and `projects/` (title, status, orientation, duration, image count), and the right side configures the next video (source, orientation, duration, segment length, voice, style). **Fill composer** writes a structured request into the input; **Fill and start** sends it. The request carries `[VCS_PARAMS_CONFIRMED]`, so the skill starts without asking the same parameters again.
 
 ## Use
 
