@@ -147,23 +147,20 @@ vcs images --project runs/demo --providers providers.json
 | 每段 | 默认 20–40 秒，可改 | `--segment-range 20-40` |
 | 音色/风格 | female/male；cinematic 等 | `--voice`、`--style` |
 
-示例：
+示例（默认直接跑完整流水线）：
 
 ```bash
-# 竖屏、固定 6 分钟
-$TEXT_PY scripts/vcs.py init --input ... --orientation portrait --duration 6
+# 竖屏、固定 6 分钟、1080x1920
+$TEXT_PY scripts/vcs.py auto --input ... --orientation portrait --duration 6 --width 1080 --height 1920 --providers providers.json
 
-# 横屏、5–8 分钟、每段 25–35 秒
-$TEXT_PY scripts/vcs.py init --input ... --orientation landscape --duration 5-8 --segment-range 25-35
+# 横屏、5–8 分钟、每段 25–35 秒、1920x1080
+$TEXT_PY scripts/vcs.py auto --input ... --orientation landscape --duration 5-8 --segment-range 25-35 --width 1920 --height 1080 --providers providers.json
 
 # 不限时长（仍保留 max_segments=60 的安全上限）
-$TEXT_PY scripts/vcs.py init --input ... --duration unlimited
+$TEXT_PY scripts/vcs.py auto --input ... --duration unlimited --providers providers.json
 
-# 自定义分辨率
-$TEXT_PY scripts/vcs.py init --input ... --orientation portrait --width 1080 --height 1920
-
-# 已有项目改配置（会删除受影响的产物，保留 transcript.md / source）
-$TEXT_PY scripts/vcs.py config --project runs/demo --orientation landscape --duration 5-8
+# 只创建项目、不跑流程（调试用）
+$TEXT_PY scripts/vcs.py init --input ... --orientation portrait --duration 6
 ```
 
 终端里也可以 `--interactive` 逐项询问；Agent 模式下由 Agent 在对话里问，再把答案传给命令。
@@ -199,7 +196,7 @@ $TEXT_PY scripts/vcs.py compose --project runs/demo
 | 音色 | female/male（`--voice`）；参考音必需（内置样本或 `--voice-ref`）+ seed |
 | 生图 | 魔搭 `Tongyi-MAI/Z-Image-Turbo`，质量档 `Qwen/Qwen-Image-2512` |
 | 字幕 | v1 不生成 |
-| 文本 | Agent 直接写文件；或 `vcs text` 调多个自定义 API |
+| 文本 | `vcs auto` 调 `vcs text`，按 `providers.json` 顺序调用自定义 API |
 
 ## `vcs auto` 内部步骤（已实现）
 

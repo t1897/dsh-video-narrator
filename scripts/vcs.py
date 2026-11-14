@@ -728,7 +728,7 @@ def _detect_input_type(raw: str, explicit: str) -> str:
 
 def ingest_project(project: Project, args: argparse.Namespace) -> None:
     raw = args.input
-    input_type = _detect_input_type(raw, args.type)
+    input_type = _detect_input_type(raw, getattr(args, "type", "auto"))
     source_dir = project.p("source")
     source_dir.mkdir(parents=True, exist_ok=True)
     meta: dict[str, Any] = {"input": raw, "type": input_type, "fetched_at": now_iso()}
@@ -2002,9 +2002,12 @@ def cmd_run(args: argparse.Namespace) -> int:
     if getattr(args, "interactive", False):
         _interactive_config(args)
     if not args.mock:
-        eprint("note: only --mock is implemented in M0; real providers land in M1-M3")
-    project = create_project(args, mock=bool(args.mock))
-    final = run_pipeline(project, mock=bool(args.mock))
+        project = create_project(args, mock=False)
+        final = auto_pipeline(project, args)
+        print(final)
+        return 0
+    project = create_project(args, mock=True)
+    final = run_pipeline(project, mock=True)
     print(final)
     return 0
 
@@ -2105,9 +2108,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_auto.add_argument("--keep-intermediates", action="store_true", help="keep audio/, clips/, logs/")
     p_auto.set_defaults(func=cmd_auto)
 
-    p_run = sub.add_parser("run", help="run the pipeline")
+    p_run = sub.add_parser("run", help="run the pipeline (real auto, or --mock)")
     add_project_args(p_run)
     p_run.add_argument("--mock", action="store_true", help="run with mock text/image/tts providers")
+    p_run.add_argument("--providers", help="providers.json with ordered text/image profiles")
+    p_run.add_argument("--voice-ref", help="optional reference audio for voice cloning")
+    p_run.add_argument("--voice-ref-text", help="transcript of the reference audio")
+    p_run.add_argument("--keep-intermediates", action="store_true", help="keep audio/, clips/, logs/")
     p_run.set_defaults(func=cmd_run)
 
     p_ingest = sub.add_parser("ingest", help="ingest video/audio/article/PDF/text")

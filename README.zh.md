@@ -6,6 +6,8 @@
 
 ## 功能
 
+`vcs auto` 在一个本地进程里跑完整条流水线；Agent 只负责发起命令和处理失败。
+
 1. 接收本地视频/音频、YouTube/Bilibili 链接、文章链接、PDF 或文本。
 2. 视频用 Qwen3-ASR（MLX）转写。
 3. 把素材整理成 Markdown 文稿，再写成带时长控制的口播稿。

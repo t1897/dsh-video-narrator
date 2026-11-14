@@ -4,7 +4,8 @@
 
 | 模式 | 用法 | 行为 |
 |---|---|---|
-| `agent`（默认） | Agent 直接写文件 | 读 `references/prompts/*.md`，写 `transcript.md` / `script.json` / `metadata.json` / `image_prompts.json`，再跑 `vcs validate` |
+| `http`（默认） | `vcs auto` 调用自定义文本 API | cleanup/script/metadata/prompts 各一次调用；按 `providers.json` 顺序回退 |
+| `agent`（调试后备） | Agent 手工写文件 | 不参与默认流程，仅在没有 HTTP provider 时调试 |
 | `http` | `vcs text --project ... --stage all` | 按 `providers.json` 的 `text` 顺序调 OpenAI 兼容 `/v1/chat/completions`，失败自动换下一个 |
 
 `agent` profile 会被 `vcs text` 跳过；要自动跑文本，至少配置一个 `provider: "openai"` 的 profile。
