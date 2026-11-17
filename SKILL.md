@@ -61,6 +61,32 @@ python3 scripts/vcs.py auto \
 
 **Agent 不要逐阶段读写文件，不要在每个阶段之间调用自己的模型。** ASR、TTS、ffmpeg、图片下载都是本地/API 操作；只有 cleanup/script/metadata/prompts 这 4 个文本阶段调用你指定的 LLM，每个阶段只调用一次。
 
+## 节点选择与重跑
+
+`vcs auto` 支持只跑到某个节点，或只重做一个节点：
+
+```bash
+# 只做到“口播稿”（复用上游，不继续生成图片/配音）
+python3 scripts/vcs.py auto --project runs/xxx --target script
+
+# 从头到“口播稿”全部重做（清掉 ASR/文稿/口播稿后重跑）
+python3 scripts/vcs.py auto --project runs/xxx --target script --rebuild
+
+# 只重做“配音”一个节点（复用文稿/口播稿/图片）
+python3 scripts/vcs.py auto --project runs/xxx --only tts --rebuild
+
+# 只重做“整理文稿”
+python3 scripts/vcs.py auto --project runs/xxx --only cleanup --rebuild
+```
+
+节点名：`asr`（转写）、`cleanup`（整理文稿/总结）、`script`（口播稿）、`metadata`（标题/标签）、`prompts`（配图 Prompt）、`images`（配图）、`tts`（配音）、`final`（成片）。
+
+- `--target X`：从开始做到 X 停止；不带 `--rebuild` 时复用已有上游。
+- `--only X`：只执行 X，其它节点一律复用；通常配合 `--rebuild` 真正重做。
+- `--rebuild`：按所选范围清空该节点/上游产物后重算。
+- `--project`：对已有项目重跑节点时必需；新视频不要传。
+- UI 左侧选中历史项目后，选“只重做节点/做到节点”会自动带上 `--project`。
+
 失败时：
 
 - 先看 `vcs status --project <dir>` 和 `logs/run.log`；

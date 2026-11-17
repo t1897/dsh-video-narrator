@@ -30,6 +30,12 @@ class MergeTest(unittest.TestCase):
         self.assertIn("大家好，欢迎收看本期节目", merged)
         self.assertEqual(merged.count("请注意，以下内容可能包含剧透"), 2)
 
+    def test_stage_aliases(self) -> None:
+        self.assertEqual(vcs.normalize_stage("final"), "compose")
+        self.assertEqual(vcs.normalize_stage("compose"), "compose")
+        self.assertEqual(vcs.normalize_stage("cleanup"), "cleanup")
+        self.assertIsNone(vcs.normalize_stage(None))
+
     def test_english_punctuation_gets_space(self) -> None:
         merged = "".join(vcs.deduplicate_text_segments([
             "The boundary ends with Donald Trump.",

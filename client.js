@@ -10,6 +10,20 @@ window.__ModuleLoader__.load({
       nav: '视频',
       title: '视频工作台',
       subtitle: '左侧查看历史项目，右侧配置下一条视频；开始后会创建新的会话。',
+      task: '任务范围',
+      full: '完整流程',
+      through: '做到节点',
+      only: '只重做节点',
+      stage: '节点',
+      rebuild: '从头重做（清空该节点/范围）',
+      stageAsr: '转写',
+      stageCleanup: '整理文稿',
+      stageScript: '口播稿',
+      stageMetadata: '标题/标签',
+      stagePrompts: '配图 Prompt',
+      stageImages: '配图',
+      stageTts: '配音',
+      stageCompose: '成片',
       workspace: '工作区',
       history: '历史项目',
       refresh: '刷新',
@@ -66,6 +80,20 @@ window.__ModuleLoader__.load({
       nav: 'Video',
       title: 'Video workbench',
       subtitle: 'Browse projects on the left, configure the next video on the right; starting creates a new session.',
+      task: 'Task scope',
+      full: 'Full pipeline',
+      through: 'Run through node',
+      only: 'Redo one node',
+      stage: 'Node',
+      rebuild: 'Rebuild from scratch (clear this node/range)',
+      stageAsr: 'Transcript',
+      stageCleanup: 'Markdown cleanup',
+      stageScript: 'Narration script',
+      stageMetadata: 'Title/tags',
+      stagePrompts: 'Image prompts',
+      stageImages: 'Images',
+      stageTts: 'Voiceover',
+      stageCompose: 'Final video',
       workspace: 'Workspace',
       history: 'Projects',
       refresh: 'Refresh',
@@ -212,6 +240,9 @@ window.__ModuleLoader__.load({
       const [style, setStyle] = useState('cinematic')
       const [customStyle, setCustomStyle] = useState('')
       const [starting, setStarting] = useState(false)
+      const [runMode, setRunMode] = useState('full')
+      const [stage, setStage] = useState('script')
+      const [rebuild, setRebuild] = useState(false)
 
       const workspaceList = Array.isArray(workspaces) ? workspaces : []
       const workspace = workspaceList.find((item) => item.path === workspacePath)
@@ -272,6 +303,9 @@ window.__ModuleLoader__.load({
         setVoiceRefText('')
         setStyle('cinematic')
         setCustomStyle('')
+        setRunMode('full')
+        setStage('script')
+        setRebuild(false)
         setError('')
         setNotice('')
       }
@@ -307,8 +341,20 @@ window.__ModuleLoader__.load({
 
       function buildMessage() {
         const lines = ['使用 video-narrator 制作视频。请直接运行 `vcs auto`，不要逐阶段手工处理。', '[VCS_PARAMS_CONFIRMED]']
-        if (source.trim()) lines.push(`素材：${source.trim()}`)
-        else lines.push('素材：待提供（请只询问素材，参数已确认）')
+        if (runMode === 'full') {
+          lines.push('任务：完整流程')
+        } else {
+          if (!selected) throw new Error('重做节点前，请先在左侧选择一个历史项目。')
+          const stageLabel = t(`stage${stage[0].toUpperCase()}${stage.slice(1)}`)
+          lines.push(`任务：${runMode === 'through' ? '做到' : '只重做'} ${stageLabel}`)
+          lines.push(`项目：${selected.path}`)
+          const flags = `--project "${selected.path}" --${runMode === 'through' ? 'target' : 'only'} ${stage}${rebuild ? ' --rebuild' : ''}`
+          lines.push(`参数：${flags}`)
+        }
+        if (runMode === 'full') {
+          if (source.trim()) lines.push(`素材：${source.trim()}`)
+          else lines.push('素材：待提供（请只询问素材，参数已确认）')
+        }
 
         const outW = Number(width)
         const outH = Number(height)
@@ -405,6 +451,28 @@ window.__ModuleLoader__.load({
             notice ? h('p', { className: 'vcn-notice' }, notice) : null,
             error ? h('p', { className: 'vcn-error' }, error) : null,
             h('div', { className: 'vcn-body' },
+              field(t('task'), h(React.Fragment, null,
+                h('select', {
+                  className: 'vcn-select', value: runMode,
+                  onChange: (event) => {
+                    const value = event.target.value
+                    setRunMode(value)
+                    if (value === 'only') setRebuild(true)
+                  },
+                },
+                  h('option', { value: 'full' }, t('full')),
+                  h('option', { value: 'through' }, t('through')),
+                  h('option', { value: 'only' }, t('only'))),
+                runMode !== 'full' ? h('select', {
+                  className: 'vcn-select', value: stage,
+                  onChange: (event) => setStage(event.target.value),
+                },
+                  ['asr', 'cleanup', 'script', 'metadata', 'prompts', 'images', 'tts', 'compose'].map((value) =>
+                    h('option', { value, key: value }, t(`stage${value[0].toUpperCase()}${value.slice(1)}`)))) : null,
+                runMode !== 'full' ? h('label', { className: 'vcn-help', style: { display: 'inline-flex', gap: '6px', flexBasis: 'auto' } },
+                  h('input', { type: 'checkbox', checked: rebuild, onChange: (event) => setRebuild(event.target.checked) }),
+                  t('rebuild')) : null,
+                runMode !== 'full' && !selected ? h('span', { className: 'vcn-help' }, '← 先在左侧选择历史项目') : null)),
               field(t('source'), h('textarea', {
                 className: 'vcn-textarea', value: source, placeholder: t('sourceHint'),
                 onChange: (event) => setSource(event.target.value),

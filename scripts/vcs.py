@@ -2112,35 +2112,144 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+AUTO_STAGES = ["ingest", "asr", "cleanup", "script", "metadata", "prompts", "images", "tts", "compose"]
+STAGE_ALIASES = {
+    "transcript": "asr",
+    "markdown": "cleanup",
+    "summary": "cleanup",
+    "script": "script",
+    "metadata": "metadata",
+    "prompts": "prompts",
+    "images": "images",
+    "tts": "tts",
+    "final": "compose",
+    "compose": "compose",
+    "video": "compose",
+}
+
+
+def normalize_stage(value: str | None) -> str | None:
+    if not value:
+        return None
+    key = str(value).strip().lower()
+    stage = STAGE_ALIASES.get(key, key)
+    if stage not in AUTO_STAGES:
+        raise VcsError(f"unknown stage: {value}; choose from {', '.join(AUTO_STAGES)}")
+    return stage
+
+
+def clear_stage_artifacts(project: Project, stage: str) -> None:
+    """Delete one stage's outputs so a rebuild recomputes it, keeping upstream inputs."""
+    paths = {
+        "asr": [project.p("01_transcript.segments.json"), project.p("source", "chunks")],
+        "cleanup": [project.p("02_transcript.md")],
+        "script": [project.p("03_script.json")],
+        "metadata": [project.p("04_metadata.json")],
+        "prompts": [project.p("05_image_prompts.json")],
+        "images": [project.p("06_images")],
+        "tts": [project.p("audio")],
+        "compose": [project.p("clips"), project.p(".merged.mp4")],
+    }
+    if stage == "asr" and str(project.config.get("input_type") or "text") == "video":
+        paths["asr"].insert(0, project.p("01_transcript.raw.txt"))
+    for path in paths.get(stage, []):
+        if path.is_dir():
+            shutil.rmtree(path, ignore_errors=True)
+        elif path.exists():
+            path.unlink(missing_ok=True)
+    if stage == "compose":
+        for path in project.root.glob("07_*.mp4"):
+            path.unlink(missing_ok=True)
+
+
 def auto_pipeline(project: Project, args: argparse.Namespace) -> Path:
-    """Run the whole local pipeline with no Agent-side stage orchestration."""
+    """Run selected pipeline stages; ASR merge and all local work stay in Python."""
+    target = normalize_stage(getattr(args, "target", None) or "final")
+    only = normalize_stage(getattr(args, "only", None))
+    if only and getattr(args, "target", None):
+        raise VcsError("--target and --only are mutually exclusive")
+
+    if only:
+        stages = [only]
+    else:
+        stages = AUTO_STAGES[: AUTO_STAGES.index(target) + 1]
+
+    if getattr(args, "rebuild", False):
+        for stage in stages:
+            clear_stage_artifacts(project, stage)
+
     log_path = project.p("logs", "run.log")
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_text(f"[{now_iso()}] start auto pipeline\n", encoding="utf-8")
-
-    ingest_project(project, args)
-    input_type = str(project.config.get("input_type") or "text")
-    if input_type == "video":
-        transcribe_project(project, language=args.language)
-    elif input_type in {"article", "pdf", "text"}:
-        eprint("asr: skipped (text input)")
-    else:
-        raise VcsError(f"auto: unsupported input type: {input_type}")
-
-    text_project(project, "all", providers_path=getattr(args, "providers", None))
-    images_project(project, providers_path=getattr(args, "providers", None))
-    tts_project(
-        project,
-        voice_ref=getattr(args, "voice_ref", None),
-        voice_ref_text=getattr(args, "voice_ref_text", None),
+    log_path.write_text(
+        f"[{now_iso()}] auto stages: {', '.join(stages)}\n", encoding="utf-8"
     )
-    return compose_project(project, keep_intermediates=bool(getattr(args, "keep_intermediates", False)))
 
+    final: Path | None = None
+    for stage in stages:
+        if stage == "ingest":
+            if not project.p("source", "source.json").exists():
+                ingest_project(project, args)
+            else:
+                eprint("ingest: reuse existing source")
+        elif stage == "asr":
+            input_type = str(project.config.get("input_type") or "text")
+            if input_type != "video":
+                if not project.p("01_transcript.raw.txt").exists():
+                    raise VcsError("raw transcript is missing for a text/article/PDF project; run ingest first")
+                eprint("asr: skipped (text input)")
+            elif not project.p("01_transcript.raw.txt").exists():
+                if not project.p("source", "source.json").exists():
+                    ingest_project(project, args)
+                transcribe_project(project, language=args.language)
+            else:
+                eprint("asr: reuse existing transcript")
+        elif stage == "cleanup":
+            if not project.p("02_transcript.md").exists():
+                text_project(project, "cleanup", providers_path=getattr(args, "providers", None))
+            else:
+                eprint("cleanup: reuse 02_transcript.md")
+        elif stage == "script":
+            if not project.p("03_script.json").exists():
+                text_project(project, "script", providers_path=getattr(args, "providers", None))
+            else:
+                eprint("script: reuse 03_script.json")
+        elif stage == "metadata":
+            if not project.p("04_metadata.json").exists():
+                text_project(project, "metadata", providers_path=getattr(args, "providers", None))
+            else:
+                eprint("metadata: reuse 04_metadata.json")
+        elif stage == "prompts":
+            if not project.p("05_image_prompts.json").exists():
+                text_project(project, "prompts", providers_path=getattr(args, "providers", None))
+            else:
+                eprint("prompts: reuse 05_image_prompts.json")
+        elif stage == "images":
+            images_project(project, providers_path=getattr(args, "providers", None))
+        elif stage == "tts":
+            tts_project(
+                project,
+                voice_ref=getattr(args, "voice_ref", None),
+                voice_ref_text=getattr(args, "voice_ref_text", None),
+            )
+        elif stage == "compose":
+            finals = sorted(project.root.glob("07_*.mp4"))
+            if finals and not getattr(args, "rebuild", False):
+                final = finals[0]
+                eprint(f"compose: reuse {final.name}")
+            else:
+                final = compose_project(
+                    project, keep_intermediates=bool(getattr(args, "keep_intermediates", False))
+                )
+
+    return final or project.root
 
 def cmd_auto(args: argparse.Namespace) -> int:
     if getattr(args, "interactive", False):
         _interactive_config(args)
-    project = create_project(args, mock=False)
+    if getattr(args, "project", None):
+        project = Project.load(Path(args.project).expanduser())
+    else:
+        project = create_project(args, mock=False)
     final = auto_pipeline(project, args)
     print(final)
     return 0
@@ -2150,7 +2259,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     if getattr(args, "interactive", False):
         _interactive_config(args)
     if not args.mock:
-        project = create_project(args, mock=False)
+        project = Project.load(Path(args.project).expanduser()) if getattr(args, "project", None) else create_project(args, mock=False)
         final = auto_pipeline(project, args)
         print(final)
         return 0
@@ -2248,8 +2357,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_auto = sub.add_parser("auto", help="run the full pipeline locally (ASR + text APIs + images + TTS + compose)")
     add_project_args(p_auto)
+    p_auto.add_argument("--project", help="existing project directory for node reruns")
     p_auto.add_argument("--type", choices=["auto", "video", "article", "pdf", "text"], default="auto")
     p_auto.add_argument("--html", help="saved HTML file for a blocked article URL")
+    p_auto.add_argument("--target", choices=["asr", "cleanup", "script", "metadata", "prompts", "images", "tts", "final", "compose"], help="stop after this node (reuses upstream artifacts)")
+    p_auto.add_argument("--only", choices=["asr", "cleanup", "script", "metadata", "prompts", "images", "tts", "final", "compose"], help="run only this node (reuse all other artifacts)")
+    p_auto.add_argument("--rebuild", action="store_true", help="rebuild the selected node/range from scratch")
     p_auto.add_argument("--providers", help="providers.json with ordered text/image profiles")
     p_auto.add_argument("--voice-ref", help="optional reference audio for voice cloning")
     p_auto.add_argument("--voice-ref-text", help="transcript of the reference audio")
@@ -2258,7 +2371,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_run = sub.add_parser("run", help="run the pipeline (real auto, or --mock)")
     add_project_args(p_run)
+    p_run.add_argument("--project", help="existing project directory for node reruns")
     p_run.add_argument("--mock", action="store_true", help="run with mock text/image/tts providers")
+    p_run.add_argument("--target", choices=["asr", "cleanup", "script", "metadata", "prompts", "images", "tts", "final", "compose"], help="stop after this node")
+    p_run.add_argument("--only", choices=["asr", "cleanup", "script", "metadata", "prompts", "images", "tts", "final", "compose"], help="run only this node")
+    p_run.add_argument("--rebuild", action="store_true", help="rebuild the selected node/range")
     p_run.add_argument("--providers", help="providers.json with ordered text/image profiles")
     p_run.add_argument("--voice-ref", help="optional reference audio for voice cloning")
     p_run.add_argument("--voice-ref-text", help="transcript of the reference audio")

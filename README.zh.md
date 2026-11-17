@@ -44,6 +44,23 @@ python3 scripts/vcs.py providers --file providers.json
 
 `providers.json` 已被 gitignore。Key 通过 `api_key_env` 指向 `.env` 里的环境变量。`text` 数组由 `vcs text` 按顺序回退；`image` 数组按场景顺序回退。魔搭国内站（`api-inference.modelscope.cn`）和国际站（`api-inference.modelscope.ai`）可以混排。
 
+## 节点重跑
+
+`vcs auto` 可以只做到某个节点，或只重做一个节点：
+
+```bash
+# 做到口播稿，复用上游
+vcs auto --project <目录> --target script
+
+# 从头到口播稿全部重做
+vcs auto --project <目录> --target script --rebuild
+
+# 只重做配音
+vcs auto --project <目录> --only tts --rebuild
+```
+
+节点：`asr`（转写）、`cleanup`（整理文稿）、`script`（口播稿）、`metadata`（标题/标签）、`prompts`（配图 Prompt）、`images`（配图）、`tts`（配音）、`final`（成片）。工作台里有对应的 **任务范围** + **节点** 选择；选择历史项目后会带上 `--project`。
+
 ## 控制 UI
 
 安装后，左侧边栏会出现 **视频** 入口。点开是常驻主面板工作台：左侧列出 `runs/` 和 `projects/` 里的历史项目（标题、状态、画幅、时长、图片数），右侧设置下一条视频（素材、画幅、时长、每段秒数、音色、风格）。点 **开始生成** 会新建会话并带上结构化请求。消息带有 `[VCS_PARAMS_CONFIRMED]`，Skill 不会再次询问同一批参数。
