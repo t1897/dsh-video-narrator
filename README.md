@@ -53,7 +53,10 @@ python3 scripts/vcs.py providers --file providers.json
 `vcs auto` can stop at a node or recompute one node:
 
 ```bash
-# Stop after the narration script, reusing upstream
+# New source: run from ingest through the narration script
+vcs auto --input <source> --target script
+
+# Existing project: stop after the narration script, reusing upstream
 vcs auto --project <dir> --target script
 
 # Rebuild everything up to the narration script

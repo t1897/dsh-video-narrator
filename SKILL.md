@@ -67,10 +67,13 @@ python3 scripts/vcs.py auto \
 `vcs auto` 支持只跑到某个节点，或只重做一个节点：
 
 ```bash
-# 只做到“口播稿”（复用上游，不继续生成图片/配音）
+# 新素材：从采集/ASR 做到“口播稿”，不生成图片/配音
+python3 scripts/vcs.py auto --input "<素材>" --target script
+
+# 已有项目：只做到“口播稿”（复用上游）
 python3 scripts/vcs.py auto --project runs/xxx --target script
 
-# 从头到“口播稿”全部重做（清掉 ASR/文稿/口播稿后重跑）
+# 已有项目：从头到“口播稿”全部重做
 python3 scripts/vcs.py auto --project runs/xxx --target script --rebuild
 
 # 只重做“配音”一个节点（复用文稿/口播稿/图片）
@@ -82,11 +85,11 @@ python3 scripts/vcs.py auto --project runs/xxx --only cleanup --rebuild
 
 节点名：`asr`（转写）、`cleanup`（整理文稿/总结）、`script`（口播稿）、`metadata`（标题/标签）、`prompts`（配图 Prompt）、`images`（配图）、`tts`（配音）、`final`（成片）。
 
-- `--target X`：从开始做到 X 停止；不带 `--rebuild` 时复用已有上游。
-- `--only X`：只执行 X，其它节点一律复用；通常配合 `--rebuild` 真正重做。
+- `--target X`：从开始做到 X 停止；**新素材可直接用**，不需要已有项目；不带 `--rebuild` 时复用已有上游。
+- `--only X`：只执行 X，其它节点一律复用；只用于已有项目，通常配合 `--rebuild` 真正重做。
 - `--rebuild`：按所选范围清空该节点/上游产物后重算。
 - `--project`：对已有项目重跑节点时必需；新视频不要传。
-- UI 左侧选中历史项目后，选“只重做节点/做到节点”会自动带上 `--project`。
+- UI：新素材选“做到节点”不带 `--project`；只有已有项目才带；`--only` 必须已有项目。
 
 失败时：
 

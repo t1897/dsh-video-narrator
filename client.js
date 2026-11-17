@@ -341,18 +341,29 @@ window.__ModuleLoader__.load({
 
       function buildMessage() {
         const lines = ['使用 video-narrator 制作视频。请直接运行 `vcs auto`，不要逐阶段手工处理。', '[VCS_PARAMS_CONFIRMED]']
+        const stageLabel = t(`stage${stage[0].toUpperCase()}${stage.slice(1)}`)
+        const hasSource = Boolean(source.trim())
+        const existing = runMode === 'only' ? selected : (runMode === 'through' && selected && !hasSource ? selected : null)
         if (runMode === 'full') {
           lines.push('任务：完整流程')
+        } else if (runMode === 'through') {
+          lines.push(`任务：做到 ${stageLabel}`)
+          if (existing) {
+            lines.push(`项目：${existing.path}`)
+            lines.push(`参数：--project "${existing.path}" --target ${stage}${rebuild ? ' --rebuild' : ''}`)
+          } else if (hasSource) {
+            lines.push(`参数：--target ${stage}${rebuild ? ' --rebuild' : ''}`)
+          } else {
+            throw new Error('新素材请填写素材；已有项目请先在左侧选择。')
+          }
         } else {
-          if (!selected) throw new Error('重做节点前，请先在左侧选择一个历史项目。')
-          const stageLabel = t(`stage${stage[0].toUpperCase()}${stage.slice(1)}`)
-          lines.push(`任务：${runMode === 'through' ? '做到' : '只重做'} ${stageLabel}`)
+          if (!selected) throw new Error('只重做节点需要先在左侧选择一个历史项目；新素材请选“做到节点”。')
+          lines.push(`任务：只重做 ${stageLabel}`)
           lines.push(`项目：${selected.path}`)
-          const flags = `--project "${selected.path}" --${runMode === 'through' ? 'target' : 'only'} ${stage}${rebuild ? ' --rebuild' : ''}`
-          lines.push(`参数：${flags}`)
+          lines.push(`参数：--project "${selected.path}" --only ${stage}${rebuild ? ' --rebuild' : ''}`)
         }
-        if (runMode === 'full') {
-          if (source.trim()) lines.push(`素材：${source.trim()}`)
+        if (runMode === 'full' || (runMode === 'through' && hasSource)) {
+          if (hasSource) lines.push(`素材：${source.trim()}`)
           else lines.push('素材：待提供（请只询问素材，参数已确认）')
         }
 
@@ -472,7 +483,7 @@ window.__ModuleLoader__.load({
                 runMode !== 'full' ? h('label', { className: 'vcn-help', style: { display: 'inline-flex', gap: '6px', flexBasis: 'auto' } },
                   h('input', { type: 'checkbox', checked: rebuild, onChange: (event) => setRebuild(event.target.checked) }),
                   t('rebuild')) : null,
-                runMode !== 'full' && !selected ? h('span', { className: 'vcn-help' }, '← 先在左侧选择历史项目') : null)),
+                runMode !== 'full' && !selected && !source.trim() ? h('span', { className: 'vcn-help' }, runMode === 'only' ? '只重做需要选择历史项目；新素材请选“做到节点”' : '输入新素材，或先在左侧选择历史项目') : null)),
               field(t('source'), h('textarea', {
                 className: 'vcn-textarea', value: source, placeholder: t('sourceHint'),
                 onChange: (event) => setSource(event.target.value),

@@ -49,7 +49,10 @@ python3 scripts/vcs.py providers --file providers.json
 `vcs auto` 可以只做到某个节点，或只重做一个节点：
 
 ```bash
-# 做到口播稿，复用上游
+# 新素材：从采集/ASR 做到口播稿
+vcs auto --input <素材> --target script
+
+# 已有项目：做到口播稿，复用上游
 vcs auto --project <目录> --target script
 
 # 从头到口播稿全部重做
