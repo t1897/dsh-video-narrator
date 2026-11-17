@@ -67,7 +67,7 @@ Nodes: `asr`, `cleanup`, `script`, `metadata`, `prompts`, `images`, `tts`, `fina
 
 ## Control UI
 
-After installation, a **Video** entry appears in the left sidebar. It opens a persistent main-panel workbench: the left side lists past projects from `runs/` and `projects/` (title, status, orientation, duration, image count), and the right side configures the next video (source, orientation, duration, segment length, voice, style). **Start** creates a new session with a structured request. The request carries `[VCS_PARAMS_CONFIRMED]`, so the skill starts without asking the same parameters again.
+After installation, a **Video** entry appears in the left sidebar. It opens a persistent main-panel workbench: the left side lists past projects from `runs/` and `projects/` (title, status, orientation, duration, image count), and the right side configures the next video (source, orientation, resolution, duration, segment length, voice, style) plus **Task scope** (full pipeline / run through a node / redo one node) and **Rebuild**. **Start** creates a new session with a structured request. The request carries `[VCS_PARAMS_CONFIRMED]`, so the skill starts without asking the same parameters again.
 
 ## Use
 
